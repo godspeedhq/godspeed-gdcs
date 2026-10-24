@@ -104,7 +104,9 @@ Profile:         network/pci, Recovery 1.0
 Environment:     simulated - QEMU 9.1, q35, e1000 (8086:100e)
 
 Contract compliance       PASS
-Capability isolation      PASS  (DMA: confined, AMD-Vi)
+Capability isolation      PASS  (MMIO, capabilities, interrupts)
+DMA isolation             NOT SHOWN  (QEMU's amd-iommu maps but does not fault;
+                                      page tables checked, no refused access)
 Functional tests          PASS  12/12
 Crash recovery            PASS  restarts bounded at 5
 Refused sends while down  PASS  1 (bounded)

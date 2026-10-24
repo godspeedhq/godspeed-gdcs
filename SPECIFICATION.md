@@ -135,6 +135,12 @@ Each is shown by the driver, or a probe in its place, attempting it and the syst
 cannot be enforced and is not tested: the report says `NOT ENFORCEABLE ON THIS MACHINE` and names the machine.
 A driver with registers only, or a USB driver, carries no such reach and is tested in full everywhere.
 
+**An isolation result is claimed only where the environment exercised it.** Confinement that exists is not
+confinement shown: a result says DMA isolation PASSED only when a DMA outside the arena was attempted and the
+environment refused it. QEMU's emulated `amd-iommu` installs the tables but does not fault on an unmapped
+access (GodspeedOS `CLAUDE.md` 22, Test 12), so in QEMU confinement can be checked only structurally - the
+device's I/O page table walked - and is reported as that, on its own line, never folded into a PASS.
+
 ### Stage 3 - Functional Correctness
 
 The driver does what its contract and documentation say it does, shown with:
@@ -253,7 +259,9 @@ Profile:         network/pci, Recovery 1.0
 Environment:     simulated - QEMU 9.1, q35, e1000 (8086:100e)
 
 Contract compliance       PASS
-Capability isolation      PASS  (DMA: confined, AMD-Vi)
+Capability isolation      PASS  (MMIO, capabilities, interrupts)
+DMA isolation             NOT SHOWN  (QEMU's amd-iommu maps but does not fault;
+                                      page tables checked, no refused access)
 Functional tests          PASS  12/12
 Crash recovery            PASS  restarts bounded at 5
 Refused sends while down  PASS  1 (bounded)
