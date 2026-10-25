@@ -1,0 +1,8 @@
+# Line-ending policy: the repository stores every text file with LF endings.
+#
+# `text=auto` lets Git tell text from binary and normalise text to LF on commit, whatever each
+# contributor has `core.autocrlf` set to. A Windows checkout may still show CRLF in its working copy;
+# what is stored, and what readers and tools fetch, is LF.
+* text=auto
+*.md text
+LICENSE text
