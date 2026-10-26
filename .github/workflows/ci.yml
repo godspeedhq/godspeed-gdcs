@@ -1,0 +1,82 @@
+name: ci
+
+# What CI can run without a machine: formatting, lints, the build, and the offline tests - Stage 1's
+# (a package built to fail each check) and Stage 2's parser (a written probe log). The QEMU cases in
+# tests/basic.rs are `#[ignore]`d and need qemu-system-x86_64, its UEFI firmware, a release image and a
+# signed probe; they are not run here (fixtures/README.md, tests/basic.rs say how to run them by hand).
+#
+# Linux and Windows both, because the suite drives QEMU over sockets and handles Windows paths
+# (src/machine.rs); a path bug must fail here, not on someone's machine.
+
+# A change to prose only (top-level *.md, SPECIFICATION.md, LICENSE) runs nothing.
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['*.md', 'LICENSE']
+  pull_request:
+    paths-ignore: ['*.md', 'LICENSE']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check:
+    name: gdcs (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust (stable, with rustfmt and clippy)
+        run: |
+          rustup toolchain install stable --profile minimal --component rustfmt,clippy
+          rustup default stable
+
+      - name: Formatting
+        run: cargo fmt --all --check
+
+      - name: Lints
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+      - name: Offline tests (the QEMU cases are #[ignore]d and do not run here)
+        run: cargo test --locked
+
+  house-rules:
+    name: house rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # No em-dash (U+2014) or en-dash (U+2013) anywhere in the source or docs. The plain ASCII hyphen is
+      # the only dash. Matches GodspeedOS's repo-wide convention (its CLAUDE.md 21), kept here by grep since
+      # this repo has no scripts/ enforcement layer of its own.
+      - name: No em or en dashes
+        run: |
+          if grep -rnP '\xe2\x80\x93|\xe2\x80\x94' --include='*.rs' --include='*.md' --include='*.toml' --include='*.json' --include='*.yml' .; then
+            echo "::error::found an em-dash or en-dash; use a plain ASCII hyphen"
+            exit 1
+          fi
+
+      # The .gitattributes stores every text file with LF. A file that slipped in with CRLF would be a
+      # cross-platform trap (it broke boot media in the OS once), so fail if any text file is stored with
+      # CRLF. The INDEX column (`i/`) is what is stored and is host-independent; the working-tree column
+      # (`w/`) is legitimately CRLF on a Windows checkout, so it is not what we check.
+      - name: Text files are stored with LF
+        run: |
+          bad=$(git ls-files --eol | grep -E '^i/(crlf|mixed)' || true)
+          if [ -n "$bad" ]; then
+            echo "$bad"
+            echo "::error::a tracked text file is stored with CRLF; it must be LF"
+            exit 1
+          fi
