@@ -1,7 +1,14 @@
 # Godspeed Driver Conformance Suite (GDCS) - Specification
 
-**Status:** draft 0.1, 2026-10-24. Nothing here is built yet. Where this document names something GodspeedOS
-already has, it says so and names it; everything else is a requirement on GDCS, not a description of it.
+**Status:** draft 0.1, 2026-10-24. Where this document names something GodspeedOS already has, it says so and
+names it; everything else is a requirement on GDCS, not a description of it.
+
+**What is built (2026-10-26), and what is not.** Stage 1 in full, offline (`gdcs check`), and the Basic profile on
+x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and Stage 2 as far as the machine shows
+it without an attempt - the grant, and whether DMA can be confined. Each check has been seen to fail. **Not built:**
+the isolation probe that makes Stage 2's attempts (so a Basic run is INCOMPLETE until it is), the other
+architectures, physical hardware, Stages 4 and 5, and the CLI commands of section 7. The README says how to run
+what is built.
 
 ## 1. Purpose
 
@@ -58,10 +65,14 @@ The kernel, the supervisor, hardware enumeration (`hw-enumerator`), the USB host
 the in-tree drivers and core services, and the OS's own test suites (`osdev`). Its standard library (`gs`,
 `stdlib/rust`) and SDK (`sdk/rust`) are Apache-2.0.
 
-### `godspeed-cli` (Apache-2.0)
+### `godspeed-cli` (GPL-2.0-only, with an Apache-2.0 OR MIT package crate)
 
 The developer's interface: `godspeed new driver`, `check`, `package`, `verify`, `inspect`, and later the
 GDCS commands of section 7. The CLI invokes GDCS and shows its results; it does not contain the test engine.
+
+Its package format crate, `crates/godspeed-package` - the manifest, its signature, the digests and the `.gsp` file
+- is Apache-2.0 OR MIT, so GDCS reads packages with the same code the CLI and the OS use (godspeed-cli `1676e4d`).
+The CLI itself is GPL-2.0-only. *(This section said the CLI was Apache-2.0; it never was.)*
 
 ### `godspeed-gdcs` (Apache-2.0)
 

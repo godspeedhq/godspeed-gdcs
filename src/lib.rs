@@ -6,6 +6,9 @@
 
 #![forbid(unsafe_code)]
 
+pub mod basic;
+pub mod declare;
+pub mod machine;
 pub mod package;
 pub mod platform;
 pub mod report;

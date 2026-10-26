@@ -160,9 +160,9 @@ pub const DRIVER_KEYS: &[&str] = &[
 
 fn result(def: TestDef, outcome: Outcome, detail: impl Into<String>, evidence: Vec<String>) -> TestResult {
     TestResult {
-        id: def.id,
+        id: def.id.to_string(),
         version: def.version,
-        title: def.title,
+        title: def.title.to_string(),
         outcome,
         detail: detail.into(),
         evidence,

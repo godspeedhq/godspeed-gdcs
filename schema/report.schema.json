@@ -4,7 +4,7 @@
   "title": "GDCS report",
   "description": "A Godspeed Driver Conformance Suite report (SPECIFICATION.md 7.2), format 1. SPDX-License-Identifier: Apache-2.0",
   "type": "object",
-  "required": ["format", "gdcs", "profile", "subject", "target", "results", "verdict"],
+  "required": ["format", "gdcs", "profile", "subject", "target", "results", "logs", "verdict"],
   "additionalProperties": false,
   "properties": {
     "format": { "const": 1 },
@@ -38,7 +38,7 @@
         "required": ["id", "version", "title", "outcome", "detail", "evidence", "environment"],
         "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^S[1-5][.][a-z0-9-]+$" },
+          "id": { "type": "string", "pattern": "^S[1-5][.][a-z0-9.-]+$" },
           "version": { "type": "integer", "minimum": 1 },
           "title": { "type": "string" },
           "outcome": {
@@ -55,6 +55,19 @@
             },
             "additionalProperties": false
           }
+        }
+      }
+    },
+    "logs": {
+      "type": "array",
+      "description": "The logs kept beside the report, each by name and SHA-256, so quoted evidence can be checked.",
+      "items": {
+        "type": "object",
+        "required": ["name", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
         }
       }
     },

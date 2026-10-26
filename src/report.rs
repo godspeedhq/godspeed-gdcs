@@ -74,11 +74,11 @@ impl Environment {
 #[derive(Clone, Debug, Serialize)]
 pub struct TestResult {
     /// Its identifier, `S1.signature`: the stage, then what it checks.
-    pub id: &'static str,
+    pub id: String,
     /// The version of its definition. A criterion that changes gets a new version, so two reports can be compared.
     pub version: u32,
     /// What it checks, in a few words.
-    pub title: &'static str,
+    pub title: String,
     /// What it showed.
     pub outcome: Outcome,
     /// One sentence: what was found, or why it did not run. Written to be acted on without the OS's source.
@@ -126,6 +126,17 @@ pub struct Report {
     pub target: Target,
     /// Every test, in the order it ran, those that did not run included.
     pub results: Vec<TestResult>,
+    /// The logs a run kept, each by its file name and SHA-256, so evidence quoted from one can be checked against it.
+    pub logs: Vec<LogFile>,
+}
+
+/// A log kept with a report.
+#[derive(Clone, Debug, Serialize)]
+pub struct LogFile {
+    /// Its file name, beside the report.
+    pub name: String,
+    /// Its SHA-256.
+    pub sha256: String,
 }
 
 /// The verdict a report ends with.
@@ -203,20 +214,16 @@ impl Report {
         }
         s.push('\n');
         let width = self.results.iter().map(|r| r.id.len()).max().unwrap_or(0);
+        let word = self.results.iter().map(|r| r.outcome.word().len()).max().unwrap_or(0);
+        let indent = " ".repeat(width + 2 + word + 2);
         for r in &self.results {
-            s.push_str(&format!(
-                "{:width$}  {:<9}  {}\n",
-                r.id,
-                r.outcome.word(),
-                r.title,
-                width = width
-            ));
+            s.push_str(&format!("{:width$}  {:word$}  {}\n", r.id, r.outcome.word(), r.title));
             if r.outcome != Outcome::Pass || verbose {
-                s.push_str(&format!("{:width$}             {}\n", "", r.detail, width = width));
+                s.push_str(&format!("{indent}{}\n", r.detail));
             }
             if verbose {
                 for e in &r.evidence {
-                    s.push_str(&format!("{:width$}               | {}\n", "", e, width = width));
+                    s.push_str(&format!("{indent}  | {e}\n"));
                 }
             }
         }

@@ -399,6 +399,7 @@ fn the_json_report_keeps_its_published_schema() {
                 platform_sha256: p.sha256,
             },
             results,
+            logs: Vec::new(),
         };
         let v: serde_json::Value = serde_json::from_str(&report.json()).unwrap();
         if let Err(errs) = compiled.validate(&v) {

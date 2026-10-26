@@ -16,9 +16,9 @@ const CAVEAT: &str = "(from the source given, which nothing binds to the package
 
 fn result(def: TestDef, outcome: Outcome, detail: String, evidence: Vec<String>) -> TestResult {
     TestResult {
-        id: def.id,
+        id: def.id.to_string(),
         version: def.version,
-        title: def.title,
+        title: def.title.to_string(),
         outcome,
         detail,
         evidence,
