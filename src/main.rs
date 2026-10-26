@@ -192,8 +192,8 @@ fn main() -> ExitCode {
                             "gdcs: Stage 1 passed; booting {} in QEMU (a few minutes)",
                             image.display()
                         );
-                        let probe = gdcs::isolation::bundled();
-                        results.extend(gdcs::basic::run(&cfg, &decl, &s, Some(&probe), &platform.os, &env));
+                        let probes = gdcs::isolation::bundled_probes();
+                        results.extend(gdcs::basic::run(&cfg, &decl, &s, Some(&probes), &platform.os, &env));
                         let serial = cfg.work.join("serial.log");
                         if let Ok(b) = std::fs::read(&serial) {
                             let kept = out.join("serial.log");

@@ -107,8 +107,8 @@ fn qemu_run(tag: &str, case: Case) -> Vec<TestResult> {
         smp: 2,
     };
     let s = subject(&file, &key, true);
-    let probe = gdcs::isolation::bundled();
-    let r = basic::run(&cfg, &decl, &s, Some(&probe), "0.31.0", &env());
+    let probes = gdcs::isolation::bundled_probes();
+    let r = basic::run(&cfg, &decl, &s, Some(&probes), "0.31.0", &env());
     for x in &r {
         eprintln!("{tag}: {} {} - {}", x.id, x.outcome.word(), x.detail);
     }
@@ -289,4 +289,43 @@ fn a_probe_built_for_another_release_does_not_run() {
     assert_eq!(probe.release, "0.31.0");
     assert!(probe.gsp.starts_with(b"godspeed-package-file 1"));
     assert!(probe.key.starts_with("ed25519:"));
+}
+
+// --- Stage 2 kill-the-caller (S2.unmapped-read), at the parser level ---
+
+#[test]
+fn the_fault_probe_pass_fail_and_missing() {
+    let env = env();
+    let good = "\
+mmu-fault-probe: reading 0x0, an address this service was never granted\n\
+supervisor: installed gdcs/mmu-fault-probe died - memory fault at 0x0, restarting (1 of 5)\n\
+supervisor: installed gdcs/mmu-fault-probe died - memory fault at 0x0 - restarted 5 times already, left down\n";
+    let r = isolation::fault_from_log(good, &env);
+    assert_eq!(r.outcome, Outcome::Pass, "{}", r.detail);
+    assert!(r.detail.contains("left down"), "{}", r.detail);
+
+    // The kernel stopped: a deliberate fault that panics or wedges the kernel is the worst outcome, and fails.
+    let panic = format!("{good}KERNEL PANIC: panicked at kernel/src/x.rs\n");
+    assert_eq!(isolation::fault_from_log(&panic, &env).outcome, Outcome::Fail);
+    assert!(isolation::fault_from_log(&panic, &env)
+        .detail
+        .contains("stopped the kernel"));
+
+    // The read returned instead of faulting: the probe says so, and it is a failure.
+    let returned = "mmu-fault-probe: reading 0x0, ...\nmmu-fault-probe: FAIL - the read of 0x0 returned; the kernel did not refuse it\n";
+    assert_eq!(isolation::fault_from_log(returned, &env).outcome, Outcome::Fail);
+
+    // A KILL, not a fault: something ended the task rather than the MMU faulting it. Not the property claimed.
+    let killed = "mmu-fault-probe: reading 0x0, ...\nsupervisor: installed gdcs/mmu-fault-probe died - killed by shell, restarting (1 of 5)\n";
+    assert_eq!(isolation::fault_from_log(killed, &env).outcome, Outcome::Fail);
+    assert!(isolation::fault_from_log(killed, &env).detail.contains("kill, not"));
+
+    // It never announced its read (never started): NOT RUN, not a false pass.
+    assert_eq!(
+        isolation::fault_from_log("nothing here\n", &env).outcome,
+        Outcome::NotRun
+    );
+    // It announced but no death was reported (machine stopped mid-way): NOT RUN.
+    let hung = "mmu-fault-probe: reading 0x0, an address this service was never granted\n";
+    assert_eq!(isolation::fault_from_log(hung, &env).outcome, Outcome::NotRun);
 }

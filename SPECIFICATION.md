@@ -4,14 +4,13 @@
 names it; everything else is a requirement on GDCS, not a description of it.
 
 **What is built (2026-10-26), and what is not.** Stage 1 in full, offline (`gdcs check`), and the Basic profile on
-x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and Stage 2 by an isolation probe
-(`fixtures/isolation-probe`) that attempts, and is refused, the things an isolated service must not do - a
-fabricated capability, a kernel-space pointer to a syscall, a gated query, the machine's power, a send capability
-to a non-peer, a guess past the syscall surface - plus the grant and whether DMA can be confined. Each check has
-been seen to fail. **Not built:** the probe's pure MMU-fault attempts (dereferencing unmapped MMIO or another
-service's memory, which kill the caller rather than returning an error - see Stage 2 below), the other
-architectures, physical hardware, Stages 4 and 5, and the CLI commands of section 7. The README says how to run
-what is built.
+x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and Stage 2 by two probes - one that
+attempts and is refused the things an isolated service must not do (a fabricated capability, a kernel-space
+pointer to a syscall, a gated query, the machine's power, a send capability to a non-peer, a guess past the
+syscall surface), and one that reads an address it was never granted and is killed by the kernel while the
+machine keeps running - plus the grant and whether DMA can be confined. Each check has been seen to fail.
+**Not built:** the other architectures, physical hardware, Stages 4 and 5, and the CLI commands of section 7.
+The README says how to run what is built.
 
 ## 1. Purpose
 
@@ -145,18 +144,19 @@ The driver cannot:
 
 Each is shown by the driver, or a probe in its place, attempting it and the system refusing it.
 
-**As built (2026-10-26): GDCS's own isolation probe (`fixtures/isolation-probe`).** It is an ordinary service
-holding nothing but `log_write`, installed like any package, that on startup attempts each unauthorized thing
-using only the published SDK (no kernel interface a driver could not use, section 11) and logs whether it was
-refused. GDCS reads those lines. The attempts a running service can make and SURVIVE to report are shown this
-way: a fabricated capability (`CapNotHeld`), a kernel-space or null pointer handed to a syscall (rejected at the
-user-pointer check, the caller surviving), a gated query without `INTROSPECT`, `Reboot`/`PowerOff` without the
-capability, `AcquireSendCap` to a non-peer without `ACQUIRE_ANY`, and thousands of out-of-range syscall numbers
-(each `UnknownSyscall`, no crash). **Recorded, not yet built (CLAUDE.md 26.7):** the pure MMU faults -
-dereferencing an unmapped MMIO address or another service's memory directly - kill the caller rather than
-returning an error, so a service cannot report them, and a deliberate one would restart-loop a managed package.
-The kernel-pointer attempt shows the syscall boundary rejecting such addresses; the MMU-enforced dereference
-fault is what GodspeedOS's own `CLAUDE.md` 22 (A15/P7) pins on every release, and GDCS does not re-show it.
+**As built (2026-10-26): two probe packages GDCS ships, each a service holding nothing but `log_write`,
+installed like any package, using only the published SDK (no kernel interface a driver could not use, section
+11).** `fixtures/isolation-probe` makes the attempts a running service can make and SURVIVE to report, and logs
+whether each was refused: a fabricated capability (`CapNotHeld`), a kernel-space or null pointer handed to a
+syscall (rejected at the user-pointer check, the caller surviving), a gated query without `INTROSPECT`,
+`Reboot`/`PowerOff` without the capability, `AcquireSendCap` to a non-peer without `ACQUIRE_ANY`, and thousands
+of out-of-range syscall numbers (each `UnknownSyscall`, no crash). `fixtures/mmu-fault-probe` makes the attempt
+that KILLS the caller: it reads an address it was never granted - an unmapped MMIO window, another service's
+memory, or any unmapped address, all unmapped for it and so all the same page fault. A service cannot report its
+own death, so the death is the evidence: the kernel kills the faulting task at the bad access, the supervisor
+reports `died - memory fault` (a fault, not a kill) and restarts it a bounded number of times before leaving it
+down, and the kernel never panics. The installed-package restart bound is what makes a deliberate fault safe to
+run (it was once recorded here as not built for want of that). GDCS reads both from the serial log.
 
 **DMA, honestly.** On a machine whose IOMMU does not confine the device, "cannot reach memory outside its arena"
 cannot be enforced and is not tested: the report says `NOT ENFORCEABLE ON THIS MACHINE` and names the machine.

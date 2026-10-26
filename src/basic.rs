@@ -86,7 +86,7 @@ pub fn run(
     cfg: &Config,
     decl: &Declaration,
     s: &Subject,
-    probe: Option<&crate::isolation::Probe>,
+    probe: Option<&crate::isolation::Probes>,
     target_release: &str,
     env: &Environment,
 ) -> Vec<TestResult> {
@@ -330,10 +330,20 @@ pub fn run(
         ));
     }
     out.push(dma(&log, s, env));
-    // Stage 2's attempts, made by the isolation probe on this same machine (the subject is already installed).
+    // Stage 2's attempts, made by GDCS's probes on this same machine (the subject is already installed): the
+    // survivable ones (reported by the probe), then the kill-the-caller one (reported by its death).
     match probe {
-        Some(p) => out.extend(crate::isolation::run(&mut m, p, target_release, env)),
-        None => push_attempts(&mut out, env),
+        Some(p) => {
+            out.extend(crate::isolation::run(&mut m, &p.survivable, target_release, env));
+            out.push(crate::isolation::run_fault(&mut m, &p.fault, target_release, env));
+        }
+        None => {
+            push_attempts(&mut out, env);
+            out.push(crate::isolation::fault_not_run(
+                env,
+                "the machine was not usable, so the fault probe could not run",
+            ));
+        }
     }
     finish(m, &mut out, env);
     out
@@ -445,6 +455,7 @@ pub fn not_run(env: &Environment, why: &str) -> Vec<TestResult> {
         out.push(result(t, env, Outcome::NotRun, why, Vec::new()));
     }
     out.extend(crate::isolation::not_run(env, why));
+    out.push(crate::isolation::fault_not_run(env, why));
     out.push(result(KERNEL, env, Outcome::NotRun, why, Vec::new()));
     out
 }
