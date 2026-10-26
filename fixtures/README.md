@@ -12,7 +12,16 @@ power, mint a send capability to a non-peer, guess past the syscall surface), lo
 `gdcs run` installs it like any package and reads those lines. The `.gsp` is the built, signed package, bundled
 into the `gdcs` binary (`include_bytes!`) so a run needs no build step; one per release it is built for.
 
-**The signing key is a THROWAWAY, in plain sight on purpose.** It is a fixture: a machine trusts it only if its
+## `mmu-fault-probe/` and `mmu-fault-probe-<release>-x86_64.gsp`
+
+GDCS's other Stage 2 fixture: the attempt that KILLS the caller. `mmu-fault-probe/` is a service that, on
+startup, announces and then reads address `0x0` - an address it was never granted, like any unmapped MMIO or
+cross-service address - which takes a page fault. A service cannot log that it was refused after it is dead, so
+the DEATH is the evidence: the kernel kills the faulting task and keeps running, the supervisor reports `died -
+memory fault` and restarts it up to the installed-package bound (`RESTARTS_MAX`, 5) before leaving it down.
+`gdcs run` reads that from the serial log (`S2.unmapped-read`). Built and signed the same way, same key.
+
+**The signing key is a THROWAWAY, in plain sight on purpose.** It signs both probes. It is a fixture: a machine trusts it only if its
 operator runs `godspeed trust add gdcs <public key>`, which GDCS's run does and then leaves (it is a disposable
 QEMU machine). It vouches for nothing.
 

@@ -1,0 +1,11 @@
+# GDCS's Stage 2 fixture for the kill-the-caller attempts. It holds nothing but `log_write`: the point is
+# that reaching anything it was not granted must fault and be refused by the kernel, not this file.
+name    = "mmu-fault-probe"
+version = "0.1.0"
+
+[resources.memory]
+request = "32MiB"
+limit   = "32MiB"
+
+[capabilities]
+log_write = true   # write lines to the kernel log - and nothing else

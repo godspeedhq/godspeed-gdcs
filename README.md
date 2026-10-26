@@ -4,9 +4,10 @@
 in a report anyone can check, what was shown, where, and what was not.
 
 > **Status: Stage 1, and the Basic profile in QEMU on x86-64.** `gdcs check` runs Stage 1 on a package file;
-> `gdcs run` adds Stages 2 and 3 on a release image in QEMU, Stage 2 by an isolation probe GDCS installs and
-> watches. [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is
-> not; [Running it](#running-it) is how.
+> `gdcs run` adds Stages 2 and 3 on a release image in QEMU, Stage 2 by two probes GDCS installs and watches -
+> one refused each thing it tries, one read of an ungranted address that the kernel kills it for while staying
+> up. [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is not;
+> [Running it](#running-it) is how.
 
 ## Why it exists
 
@@ -177,16 +178,18 @@ S2.introspect                        PASS       a gated kernel query is denied w
 S2.reboot                            PASS       the machine's power is denied without the capability
 S2.acquire                           PASS       a send capability to a non-peer is denied
 S2.fuzz                              PASS       out-of-range syscalls return a defined error, no crash
+S2.unmapped-read                     PASS       a dereference of an address not granted faults, killing the caller, not the kernel
 S3.kernel                            PASS       no kernel panic or wedge
 
-28 run: 27 passed, 0 failed, 0 not run, 1 not shown or not enforceable, 0 findings
+29 run: 28 passed, 0 failed, 0 not run, 1 not shown or not enforceable, 0 findings
 RESULT: CONFORMANT (offline + simulated)
 ```
 
 `S2.dma` is `NOT ENFORCEABLE` because QEMU's `pc` board has no IOMMU; on a machine that confines the device it
-reads `NOT SHOWN` (QEMU maps but does not fault) or, on silicon, `PASS`. The S2 attempts are made by GDCS's
-[isolation probe](fixtures/), installed on the same machine; the pure MMU-fault attempts are recorded as not yet
-built (`SPECIFICATION.md` Stage 2).
+reads `NOT SHOWN` (QEMU maps but does not fault) or, on silicon, `PASS`. The S2 attempts are made by GDCS's two
+[probes](fixtures/), installed on the same machine: the survivable ones logged by the probe, and
+`S2.unmapped-read` shown by the fault probe's death (the kernel kills it at the bad access, restarts it a bounded
+number of times, and leaves it down, all without panicking).
 
 **Its own tests.** `cargo test` runs Stage 1's and the Stage 2 parser's: a package or a log built to fail each
 check, which fails that check and no other. The QEMU cases are `#[ignore]`d and named in `tests/basic.rs`, with
