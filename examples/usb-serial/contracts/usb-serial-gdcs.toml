@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# The driver's contract: what it REQUESTS, the device among it. It grants nothing. The operator approves
+# the device at `godspeed install`, and the OS finds WHICH device that is on its own bus scan: a contract
+# names a kind of device, never an address.
+# Format: contracts/schema/service.schema.json in GodspeedOS. `godspeed check` validates against it.
+name    = "usb-serial-gdcs"
+version = "0.1.0"
+
+[resources.memory]
+request = "16MiB"
+limit   = "16MiB"
+
+[capabilities]
+log_write = true      # write lines to the kernel log
+# The device, by its USB vendor and product: an FTDI FT232 serial adapter (QEMU's `usb-serial`). A USB device has
+# no registers, interrupt or DMA of its own - they are its host's - so a USB driver asks for none: the host that
+# binds the device serves its transfers to this driver (`gs::driver::bus`).
+hw_usb = "0403:6001"

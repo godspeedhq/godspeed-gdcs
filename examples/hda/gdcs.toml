@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: Apache-2.0
+# GDCS declaration: what the Godspeed Driver Conformance Suite (godspeed-gdcs) reads to test this driver.
+# It is the driver author's, kept beside the source. Not needed to build or package the driver; only to test it.
+
+format = 1
+
+# The GodspeedOS release this driver is built and tested against. GDCS checks it against the platform file and
+# image it is given and refuses to start on a mismatch, so a test against the wrong release is caught up front.
+[target]
+os = "0.31.0"
+
+# What QEMU must be given to exercise the driver, beyond the disks and network card GDCS always adds: an HD Audio
+# controller and a codec on it. GDCS's machine always has a silent audio backend, `gdcs-audio`, for a codec to use.
+[qemu]
+devices = ["intel-hda", "hda-output,audiodev=gdcs-audio"]
+
+# What the driver claims to do: a line it logs when it has done its job, which GDCS waits for after installing
+# it (Stage 3). A functional pass covers only what is declared here.
+[[behaviour]]
+id = "codec-verbs-by-interrupt"
+expect = "answered over the CORB/RIRB, by interrupt"
+within-secs = 30
