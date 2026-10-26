@@ -32,7 +32,7 @@ The line it sent reaches the serial port. GDCS's machine connects the adapter to
 file beside the report as `gdcs-serial.out`, holding `hello from usb-serial-gdcs`.
 
 It receives nothing: it is a conformance subject, not a serial driver. Bulk IN needs something on the far side
-of the port to send, and a file sends nothing. On v0.31.0 it is CONFORMANT (simulated), **29 of 29**. `S2.dma`
+of the port to send, and a file sends nothing. On v0.32.0 it is CONFORMANT (simulated) on x86-64 and on riscv64, **29 of 29**. `S2.dma`
 passes here because a USB driver has no DMA arena, so its device has no DMA reach to confine.
 
 ## Build and run
@@ -45,7 +45,7 @@ cd examples/usb-serial
 godspeed check
 godspeed package --local        # every architecture; GODSPEED_SIGNING_KEY=<a seed> to sign it
 gdcs run usb-serial-gdcs-0.1.0.gsp --platform godspeed-platform.toml \
-    --image godspeed-os-v0.31.0-x86_64.img --source . --out gdcs-run
+    --image godspeed-os-v0.32.0-x86_64.img --source . --out gdcs-run
 ```
 
 The declaration gives QEMU a USB host and the adapter on it: `devices = ["qemu-xhci,id=xhci",

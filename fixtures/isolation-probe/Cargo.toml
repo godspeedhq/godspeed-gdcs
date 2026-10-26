@@ -9,10 +9,10 @@ path = "src/main.rs"
 
 [dependencies]
 # The Godspeed standard library, at the OS release this project was created against.
-godspeed = { git = "https://github.com/godspeedhq/godspeed-os", tag = "v0.31.0" }
+godspeed = { git = "https://github.com/godspeedhq/godspeed-os", tag = "v0.32.0" }
 # The SDK, at the SAME release, for `adversarial`: the raw-syscall and fault primitives a conformance probe
 # needs and a model driver never would. Same tag as `godspeed`, so their `ServiceContext` is the one type.
-godspeed-sdk = { git = "https://github.com/godspeedhq/godspeed-os", tag = "v0.31.0" }
+godspeed-sdk = { git = "https://github.com/godspeedhq/godspeed-os", tag = "v0.32.0" }
 
 # This project is its own workspace, wherever it is created.
 [workspace]

@@ -11,11 +11,13 @@ dependencies = [
 
 [[package]]
 name = "godspeed"
-version = "0.31.0"
+version = "0.32.0"
+source = "git+https://github.com/godspeedhq/godspeed-os?tag=v0.32.0#7c0c9499f5af26ac8e22a7c0382c016cb23da146"
 dependencies = [
  "godspeed-sdk",
 ]
 
 [[package]]
 name = "godspeed-sdk"
-version = "0.31.0"
+version = "0.32.0"
+source = "git+https://github.com/godspeedhq/godspeed-os?tag=v0.32.0#7c0c9499f5af26ac8e22a7c0382c016cb23da146"

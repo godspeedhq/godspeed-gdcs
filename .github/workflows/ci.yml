@@ -65,7 +65,7 @@ jobs:
       matrix:
         # The release the examples' gdcs.toml [target] names. `gdcs check` refuses a mismatch, so a release
         # bump changes the examples and this line together.
-        os_ref: [v0.31.0]
+        os_ref: [v0.32.0]
     steps:
       - uses: actions/checkout@v5
 

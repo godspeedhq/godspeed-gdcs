@@ -112,7 +112,7 @@ fn qemu_run(tag: &str, case: Case) -> Vec<TestResult> {
     };
     let s = subject(&file, &key, true);
     let probes = gdcs::isolation::bundled_probes();
-    let r = basic::run(&cfg, &decl, &s, Some(&probes), "0.31.0", &env());
+    let r = basic::run(&cfg, &decl, &s, Some(&probes), "0.32.0", &env());
     for x in &r {
         eprintln!("{tag}: {} {} - {}", x.id, x.outcome.word(), x.detail);
     }
@@ -288,9 +288,9 @@ isolation-probe: done, 6 of 6 refused\n";
 fn a_probe_built_for_another_release_does_not_run() {
     let probe = isolation::bundled();
     // from_log is release-agnostic; the release gate is in run(), checked here by its public contract:
-    // the bundled probe names 0.31.0, so a mismatch is the caller's to detect. We assert the fact the
+    // the bundled probe names 0.32.0, so a mismatch is the caller's to detect. We assert the fact the
     // gate depends on, so a rebuilt probe that forgets to update the release constant fails this.
-    assert_eq!(probe.release, "0.31.0");
+    assert_eq!(probe.release, "0.32.0");
     assert!(probe.gsp.starts_with(b"godspeed-package-file 1"));
     assert!(probe.key.starts_with("ed25519:"));
 }
@@ -449,7 +449,7 @@ fn carnage_on_a_real_machine_is_bounded_and_survivable() {
     };
     let s = subject(&file, &key, true);
     let expect = std::env::var("GDCS_EXPECT").expect("GDCS_EXPECT");
-    let r = carnage::run(&cfg, &s, Some(&expect), "0.31.0", &env());
+    let r = carnage::run(&cfg, &s, Some(&expect), "0.32.0", &env());
     for x in &r {
         eprintln!("carnage: {} {} - {}", x.id, x.outcome.word(), x.detail);
     }

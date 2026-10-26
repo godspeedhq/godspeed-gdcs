@@ -36,8 +36,8 @@ const FIXTURE_KEY: &str = "ed25519:d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016
 /// The survivable-attempts probe compiled into this binary (`fixtures/isolation-probe-<release>.gsp`).
 pub fn bundled() -> Probe {
     Probe {
-        gsp: include_bytes!("../fixtures/isolation-probe-0.31.0.gsp"),
-        release: "0.31.0",
+        gsp: include_bytes!("../fixtures/isolation-probe-0.32.0.gsp"),
+        release: "0.32.0",
         key: FIXTURE_KEY,
     }
 }
@@ -62,8 +62,8 @@ pub fn bundled_probes() -> Probes {
 /// granted, and its death is the evidence (`run_fault`).
 pub fn bundled_fault() -> Probe {
     Probe {
-        gsp: include_bytes!("../fixtures/mmu-fault-probe-0.31.0.gsp"),
-        release: "0.31.0",
+        gsp: include_bytes!("../fixtures/mmu-fault-probe-0.32.0.gsp"),
+        release: "0.32.0",
         key: FIXTURE_KEY,
     }
 }

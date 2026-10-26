@@ -24,7 +24,7 @@ hda-gdcs: HD Audio 1.0, codec 0 is 1af4:0012 revision 0x00100101 - answered over
 ```
 
 It plays nothing: it is a conformance subject, not an audio driver. Its `gdcs.toml` declares exactly that
-behaviour. On v0.31.0 it is CONFORMANT (simulated), 28 of 29 tests passing. The 29th, `S2.dma`, reads NOT
+behaviour. On v0.32.0 it is CONFORMANT (simulated) on x86-64 and on riscv64, 28 of 29 tests passing. The 29th, `S2.dma`, reads NOT
 ENFORCEABLE because QEMU's `pc` board has no IOMMU.
 
 ## Build and run
@@ -37,7 +37,7 @@ cd examples/hda
 godspeed check
 godspeed package --local        # every architecture; GODSPEED_SIGNING_KEY=<a seed> to sign it
 gdcs run hda-gdcs-0.1.0.gsp --platform godspeed-platform.toml \
-    --image godspeed-os-v0.31.0-x86_64.img --source . --out gdcs-run
+    --image godspeed-os-v0.32.0-x86_64.img --source . --out gdcs-run
 ```
 
 The declaration gives QEMU the controller and a codec: `devices = ["intel-hda",

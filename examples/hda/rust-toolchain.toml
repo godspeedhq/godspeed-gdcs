@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# The compiler GodspeedOS v0.31.0 is built with. Keep it equal to the OS's own pin:
+# The compiler GodspeedOS v0.32.0 is built with. Keep it equal to the OS's own pin:
 # `godspeed check` and `godspeed build` refuse a mismatch.
 [toolchain]
 channel = "nightly-2026-05-16"
