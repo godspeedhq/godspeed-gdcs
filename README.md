@@ -218,7 +218,13 @@ RESULT: CONFORMANT (offline + simulated)
 ```
 
 **Real drivers to try it on.** [`examples/`](examples) holds driver packages for devices QEMU emulates. Each is a
-reference for one shape of driver, and each is CONFORMANT (simulated) on v0.31.0:
+reference for one shape of driver, and each is CONFORMANT (simulated) on v0.31.0, run in QEMU on x86-64.
+
+Every example is also **built and checked for all four architectures GodspeedOS supports** (x86_64, aarch64,
+armv7, riscv64). CI packages each one for every architecture against the release its `gdcs.toml` names, and
+`gdcs check` verifies each binary is an executable of its machine (the `examples` job). That shows the driver
+builds against the published interfaces on every architecture. It does not show it running there: GDCS runs
+x86-64 QEMU only so far.
 
 | Example | The shape it shows | Device |
 |---|---|---|

@@ -52,6 +52,85 @@ jobs:
       - name: Offline tests (the QEMU cases are #[ignore]d and do not run here)
         run: cargo test --locked
 
+  # Every example, built for every architecture GodspeedOS supports and checked by GDCS itself (Stage 1,
+  # offline): each package must carry a binary for x86_64, aarch64, armv7 and riscv64, each an executable ELF
+  # of its machine, built against the release its gdcs.toml [target] names. This is what makes "built and
+  # checked for all four architectures" a standing fact rather than a one-time record. It does not run them:
+  # running is `gdcs run`, x86-64 QEMU only (README, "Running it").
+  examples:
+    name: examples on every architecture (GodspeedOS ${{ matrix.os_ref }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The release the examples' gdcs.toml [target] names. `gdcs check` refuses a mismatch, so a release
+        # bump changes the examples and this line together.
+        os_ref: [v0.31.0]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check out GodspeedOS ${{ matrix.os_ref }}
+        uses: actions/checkout@v5
+        with:
+          repository: godspeedhq/godspeed-os
+          ref: ${{ matrix.os_ref }}
+          path: godspeed-os
+
+      - name: Check out the developer CLI
+        uses: actions/checkout@v5
+        with:
+          repository: godspeedhq/godspeed-cli
+          path: godspeed-cli
+
+      - name: Install Rust (stable, for the CLI and GDCS)
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      # The compiler and targets the release pins, read from its rust-toolchain.toml, so this can never drift.
+      - name: Install the toolchain GodspeedOS ${{ matrix.os_ref }} pins
+        working-directory: godspeed-os
+        run: |
+          read -r channel targets < <(python3 - <<'EOF'
+          import tomllib
+          t = tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]
+          print(t["channel"], ",".join(t.get("targets", [])))
+          EOF
+          )
+          echo "toolchain $channel, targets $targets"
+          rustup toolchain install "$channel" --profile minimal --target "$targets"
+
+      - name: Build the CLI and GDCS
+        run: |
+          (cd godspeed-cli && cargo build --locked)
+          cargo build --locked
+
+      - name: Fetch the release's platform file
+        run: curl -fsSL -o godspeed-platform.toml "https://github.com/godspeedhq/godspeed-os/releases/download/${{ matrix.os_ref }}/godspeed-platform.toml"
+
+      # The signing seed is the fixtures' THROWAWAY key, in plain sight in fixtures/README.md: a CI-built package
+      # vouches for nothing and is never published.
+      - name: Package every example for every architecture, and check it
+        env:
+          GODSPEED_OS: ${{ github.workspace }}/godspeed-os
+          GODSPEED_SIGNING_KEY: "1111111111111111111111111111111111111111111111111111111111111111"
+        run: |
+          godspeed="$PWD/godspeed-cli/target/debug/godspeed"
+          gdcs="$PWD/target/debug/gdcs"
+          platform="$PWD/godspeed-platform.toml"
+          fail=0
+          for dir in examples/*/; do
+            name=$(basename "$dir")
+            echo "::group::$name"
+            (cd "$dir" && rm -f ./*.gsp && "$godspeed" package --local) || { echo "::error::$name: package failed"; fail=1; echo "::endgroup::"; continue; }
+            gsp=$(ls "$dir"*.gsp)
+            elfs=$(grep -ac '^entry [0-9]* packages/.*\.elf$' "$gsp")
+            if [ "$elfs" -ne 4 ]; then echo "::error::$name: $elfs binaries in its package, not 4"; fail=1; fi
+            "$gdcs" check "$gsp" --platform "$platform" --source "$dir" -v || { echo "::error::$name: gdcs check did not pass"; fail=1; }
+            echo "::endgroup::"
+          done
+          exit $fail
+
   house-rules:
     name: house rules
     runs-on: ubuntu-latest

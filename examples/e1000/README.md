@@ -27,13 +27,16 @@ ENFORCEABLE because QEMU's `pc` board has no IOMMU.
 
 ## Build and run
 
+It builds for all four architectures GodspeedOS supports (x86_64, aarch64, armv7, riscv64), and CI checks
+every binary with `gdcs check` on each change. It runs, under GDCS, in QEMU on x86-64.
+
 This needs the developer CLI (`godspeed`) and the release's platform file and image (see the top-level
 README):
 
 ```
 cd examples/e1000
 godspeed check
-godspeed package --arch x86_64 --local        # GODSPEED_SIGNING_KEY=<a seed> to sign it
+godspeed package --local        # every architecture; GODSPEED_SIGNING_KEY=<a seed> to sign it
 gdcs run e1000-gdcs-0.1.0.gsp --platform godspeed-platform.toml \
     --image godspeed-os-v0.31.0-x86_64.img --source . --out gdcs-run
 ```
