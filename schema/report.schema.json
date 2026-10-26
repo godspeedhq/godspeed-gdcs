@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/godspeedhq/godspeed-gdcs/schema/report.schema.json",
+  "title": "GDCS report",
+  "description": "A Godspeed Driver Conformance Suite report (SPECIFICATION.md 7.2), format 1. SPDX-License-Identifier: Apache-2.0",
+  "type": "object",
+  "required": ["format", "gdcs", "profile", "subject", "target", "results", "logs", "verdict"],
+  "additionalProperties": false,
+  "properties": {
+    "format": { "const": 1 },
+    "gdcs": { "type": "string", "description": "The suite's version." },
+    "profile": { "type": "string", "description": "The profile and its version, or the stage when only one ran." },
+    "subject": {
+      "type": "object",
+      "required": ["name", "version", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "publisher/name, or the file name when the package did not read." },
+        "version": { "type": ["string", "null"] },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Of the whole package file." }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": ["os", "commit", "platform_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "os": { "type": "string" },
+        "commit": { "type": "string" },
+        "platform_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "results": {
+      "type": "array",
+      "description": "Every test, in the order it ran, the ones that did not run included.",
+      "items": {
+        "type": "object",
+        "required": ["id", "version", "title", "outcome", "detail", "evidence", "environment"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^S[1-5][.][a-z0-9.-]+$" },
+          "version": { "type": "integer", "minimum": 1 },
+          "title": { "type": "string" },
+          "outcome": {
+            "enum": ["pass", "fail", "not-run", "not-shown", "not-enforceable", "not-supported", "finding"]
+          },
+          "detail": { "type": "string" },
+          "evidence": { "type": "array", "items": { "type": "string" } },
+          "environment": {
+            "type": "object",
+            "required": ["kind"],
+            "properties": {
+              "kind": { "enum": ["offline", "simulated", "hardware"] },
+              "detail": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "logs": {
+      "type": "array",
+      "description": "The logs kept beside the report, each by name and SHA-256, so quoted evidence can be checked.",
+      "items": {
+        "type": "object",
+        "required": ["name", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "verdict": {
+      "enum": ["conformant", "not-conformant", "incomplete"],
+      "description": "Any fail is not-conformant; otherwise any not-run is incomplete. The other outcomes never decide it."
+    }
+  }
+}

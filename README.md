@@ -3,8 +3,10 @@
 **The Godspeed Driver Conformance Suite (GDCS)**: an independent way to test a GodspeedOS driver and to say,
 in a report anyone can check, what was shown, where, and what was not.
 
-> **Status: specification only.** Nothing here is built yet. [`SPECIFICATION.md`](SPECIFICATION.md) is the
-> draft (0.1, 2026-10-24) and the place to start.
+> **Status: Stage 1, and the Basic profile in QEMU on x86-64.** `gdcs check` runs Stage 1 on a package file;
+> `gdcs run` adds Stages 2 and 3 on a release image in QEMU, Stage 2 by an isolation probe GDCS installs and
+> watches. [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is
+> not; [Running it](#running-it) is how.
 
 ## Why it exists
 
@@ -119,7 +121,76 @@ Physical hardware:        not tested
 RESULT: CONFORMANT (simulated)
 ```
 
-Illustrative: no part of this is built yet.
+Illustrative: the shape of a Recovery report. Recovery (Stage 4) is not built yet; a Basic run is below.
+
+## Running it
+
+GDCS is a Rust program (`cargo build --release`; the binary is `gdcs`). It needs a driver package and, from the
+[GodspeedOS release](https://github.com/godspeedhq/godspeed-os/releases) it targets, `godspeed-platform.toml` and,
+for `run`, the x86-64 image unpacked from `godspeed-os-<tag>-x86_64.img.zip`.
+
+```
+gdcs check edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver
+gdcs run   edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver \
+           --image godspeed-os-v0.31.0-x86_64.img --out gdcs-run
+```
+
+- **`check`** is Stage 1 alone, on the file, with no machine. `--source` is the driver's project folder, for the
+  two tests a binary cannot answer (no `unsafe` of its own, direct SDK use); without it they read NOT RUN.
+- **`run`** is the Basic profile: Stage 1, then the package installed on the release in QEMU exactly as an operator
+  would - the data disk formatted with `drives flash`, the package served from this machine and fetched with
+  `download`, its key trusted with `godspeed trust add`, `godspeed install` - and watched. It needs
+  `qemu-system-x86_64` and the UEFI firmware QEMU ships (`share/edk2-x86_64-code.fd`; `--qemu` and `--firmware`
+  name them otherwise). A run takes a few minutes. `--out` gets `report.txt`, `report.json` and `serial.log`, with
+  the log's SHA-256 in the report.
+- Exit status: 0 conformant, 1 not conformant, 3 incomplete (a required test did not run), 2 the run could not start.
+
+**The driver's declaration**, `gdcs.toml` in its project folder, says what the driver claims to do and what QEMU must
+give it. A functional pass covers only what is declared; a driver that declares nothing is a probe, and says so.
+
+```toml
+format = 1
+
+[qemu]
+devices = ["edu"]
+
+[[behaviour]]
+id = "identity-factorial-dma"
+expect = "edu-driver: device id 0x010000ed, alive true, 5! = 120 by interrupt, 64 bytes through DMA and back intact"
+within-secs = 30
+```
+
+That is the declaration of the driver `godspeed new driver` makes, and the Stages 2 and 3 of a `run` of it on
+v0.31.0 (2026-10-26); Stage 1 is the 14 `S1.*` tests shown earlier:
+
+```
+S3.boot                              PASS       the release boots to a prompt
+S3.setup                             PASS       a data disk, the package fetched, its key trusted
+S3.install                           PASS       installed and started by the supervisor
+S3.behaviour.identity-factorial-dma  PASS       declared behaviour
+S3.running                           PASS       still running after its behaviour
+S2.privilege                         PASS       given no privilege
+S2.dma                               NOT ENFORCEABLE ON THIS MACHINE  DMA confined to its arena
+S2.forged-cap                        PASS       a fabricated capability is refused
+S2.kernel-pointer                    PASS       a kernel-space pointer to a syscall is refused
+S2.introspect                        PASS       a gated kernel query is denied without INTROSPECT
+S2.reboot                            PASS       the machine's power is denied without the capability
+S2.acquire                           PASS       a send capability to a non-peer is denied
+S2.fuzz                              PASS       out-of-range syscalls return a defined error, no crash
+S3.kernel                            PASS       no kernel panic or wedge
+
+28 run: 27 passed, 0 failed, 0 not run, 1 not shown or not enforceable, 0 findings
+RESULT: CONFORMANT (offline + simulated)
+```
+
+`S2.dma` is `NOT ENFORCEABLE` because QEMU's `pc` board has no IOMMU; on a machine that confines the device it
+reads `NOT SHOWN` (QEMU maps but does not fault) or, on silicon, `PASS`. The S2 attempts are made by GDCS's
+[isolation probe](fixtures/), installed on the same machine; the pure MMU-fault attempts are recorded as not yet
+built (`SPECIFICATION.md` Stage 2).
+
+**Its own tests.** `cargo test` runs Stage 1's and the Stage 2 parser's: a package or a log built to fail each
+check, which fails that check and no other. The QEMU cases are `#[ignore]`d and named in `tests/basic.rs`, with
+the variables they need.
 
 ## AI-assisted drivers
 

@@ -1,0 +1,13 @@
+# Godspeed project manifest. It says what kind of project this is, where its contract is, and what a
+# package of it says about itself. Name, version and the authority the service requests live in the
+# contract, not here.
+format   = 1
+kind     = "service"
+contract = "contracts/isolation-probe.toml"
+
+description = "A Godspeed service"
+
+# The namespace a package of this service is published under: "alice" makes it alice/isolation-probe.
+# `godspeed package` needs it.
+publisher = "gdcs"
+# license   = "MIT"

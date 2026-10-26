@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "gdcs"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "The Godspeed Driver Conformance Suite: tests a GodspeedOS driver package and reports what was shown"
+rust-version = "1.80"
+
+[[bin]]
+name = "gdcs"
+path = "src/main.rs"
+
+[dependencies]
+# The package format: the same reader and verifier the CLI and the OS use, so a package means the same thing
+# here as there. Apache-2.0 OR MIT since godspeed-cli 1676e4d (merged to main in 9afe4ed); pinned by rev, as the OS pins it.
+godspeed-package = { git = "https://github.com/godspeedhq/godspeed-cli", rev = "9afe4ed01838eeabc81ef835deb5bb0ca7a101a4", features = ["toml"] }
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+# The validator, at the version the CLI and `osdev validate` use, so a contract gets the same verdict here.
+jsonschema = { version = "0.18", default-features = false }
