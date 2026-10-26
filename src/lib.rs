@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 pub mod basic;
+pub mod carnage;
 pub mod declare;
 pub mod isolation;
 pub mod machine;
