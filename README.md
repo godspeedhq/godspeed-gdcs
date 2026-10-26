@@ -131,16 +131,15 @@ Illustrative: the shape of a Recovery report. Recovery (Stage 4) is not built ye
 GDCS is a Rust program (`cargo build --release`; the binary is `gdcs`). It needs a driver package and, from the
 [GodspeedOS release](https://github.com/godspeedhq/godspeed-os/releases) it targets, `godspeed-platform.toml` and,
 for `run`, the image for the machine: on x86-64 the image unpacked from `godspeed-os-<tag>-x86_64.img.zip`, on
-riscv64 (`--arch riscv64`) the QEMU `virt` kernel `godspeed-os-<tag>-riscv64-qemu-virt.elf`. A release ships that
-kernel from the one after v0.31.0; for v0.31.0 itself there is none, and its riscv64 network driver does not drive
-QEMU's e1000, so a riscv64 run needs the next release.
+riscv64 (`--arch riscv64`) the QEMU `virt` kernel `godspeed-os-<tag>-riscv64-qemu-virt.elf`, which a release ships
+from v0.32.0.
 
 ```
 gdcs check edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver
 gdcs run   edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver \
-           --image godspeed-os-v0.31.0-x86_64.img --out gdcs-run
+           --image godspeed-os-v0.32.0-x86_64.img --out gdcs-run
 gdcs run   ... --recovery        # the Recovery profile: also Stage 4 (MAX CARNAGE)
-gdcs run   ... --arch riscv64 --image godspeed-os-<tag>-riscv64-qemu-virt.elf   # on QEMU virt
+gdcs run   ... --arch riscv64 --image godspeed-os-v0.32.0-riscv64-qemu-virt.elf   # on QEMU virt
 ```
 
 - **`check`** is Stage 1 alone, on the file, with no machine. `--source` is the driver's project folder, for the
@@ -165,7 +164,7 @@ nothing is a probe, and says so.
 format = 1
 
 [target]
-os = "0.31.0"                 # the GodspeedOS release this driver is built and tested against
+os = "0.32.0"                 # the GodspeedOS release this driver is built and tested against
 
 [qemu]
 devices = ["edu"]
@@ -223,15 +222,15 @@ RESULT: CONFORMANT (offline + simulated)
 ```
 
 **Real drivers to try it on.** [`examples/`](examples) holds driver packages for devices QEMU emulates. Each is a
-reference for one shape of driver, and each is CONFORMANT (simulated) on v0.31.0, run in QEMU on x86-64.
+reference for one shape of driver, and each is CONFORMANT (simulated) on v0.32.0, run in QEMU on x86-64, and all
+but `xhci` on riscv64 too.
 
 Every example is also **built and checked for all four architectures GodspeedOS supports** (x86_64, aarch64,
 armv7, riscv64). CI packages each one for every architecture against the release its `gdcs.toml` names, and
 `gdcs check` verifies each binary is an executable of its machine (the `examples` job). That shows the driver
 builds against the published interfaces on every architecture.
 
-**Run on riscv64 too** (QEMU `virt`, 2026-10-26, every one with `--recovery`, against the OS change that ships
-the virt kernel - not yet released):
+**Run on riscv64 too** (QEMU `virt`, 2026-10-26, on the v0.32.0 release kernel, every one with `--recovery`):
 
 | Example | riscv64 result |
 |---|---|
@@ -240,7 +239,7 @@ the virt kernel - not yet released):
 | `usb-serial` | CONFORMANT, 34/34; its device on the disk's xHCI (`[qemu.riscv64]` in its `gdcs.toml`) |
 | `xhci` | not run - its `gdcs.toml` says why: the riscv64 disk is on the xHCI it would take over |
 
-Running them found three gaps in the OS on this port, now closed in the same change: the network driver did not
+Running them found three gaps in the OS on this port, closed in v0.32.0: the network driver did not
 drive the e1000, no PCI interrupt reached a driver package (riscv64 had no PLIC driver; it has one now), and the
 machine never said whether it could confine DMA. That is what GDCS is for.
 

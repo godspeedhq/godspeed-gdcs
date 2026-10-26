@@ -22,7 +22,7 @@ It is bring-up and one transmit, not a full NIC driver: no receive path and noth
 The first GDCS run of this driver turned up a gap in GDCS itself. Installing a driver that claims the network
 device stops GodspeedOS's own `nic-driver`, so `net-stack` loses its link, and GDCS could no longer download
 its Stage 2 probes. GDCS now fetches the probes before it installs the driver under test (PR #7). With that
-fix this driver is CONFORMANT (simulated) on v0.31.0, 28 of 29 tests passing. The 29th, `S2.dma`, reads NOT
+fix this driver is CONFORMANT (simulated) on v0.32.0, on x86-64 and on riscv64, 28 of 29 tests passing. The 29th, `S2.dma`, reads NOT
 ENFORCEABLE because QEMU's `pc` board has no IOMMU.
 
 ## Build and run
@@ -38,7 +38,7 @@ cd examples/e1000
 godspeed check
 godspeed package --local        # every architecture; GODSPEED_SIGNING_KEY=<a seed> to sign it
 gdcs run e1000-gdcs-0.1.0.gsp --platform godspeed-platform.toml \
-    --image godspeed-os-v0.31.0-x86_64.img --source . --out gdcs-run
+    --image godspeed-os-v0.32.0-x86_64.img --source . --out gdcs-run
 ```
 
 QEMU needs no extra device: GDCS's machine always has an e1000, which this driver takes over from

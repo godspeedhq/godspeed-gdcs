@@ -1,13 +1,13 @@
 # mmu-fault-probe
 
-A Godspeed service, created by `godspeed new service mmu-fault-probe` against GodspeedOS v0.31.0.
+A Godspeed service, created by `godspeed new service mmu-fault-probe` against GodspeedOS v0.31.0 (re-pinned to v0.32.0, whose interfaces are unchanged).
 
 ## Files
 
 - `src/main.rs` - the service. It starts at `service_main` and never returns.
 - `contracts/mmu-fault-probe.toml` - the authority the service **requests**. It grants nothing; the OS decides.
 - `godspeed.toml` - what kind of project this is, for the `godspeed` CLI.
-- `rust-toolchain.toml` - the compiler GodspeedOS v0.31.0 is built with.
+- `rust-toolchain.toml` - the compiler GodspeedOS v0.32.0 is built with.
 
 ## Build
 

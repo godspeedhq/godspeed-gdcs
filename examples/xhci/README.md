@@ -26,7 +26,7 @@ xhci-gdcs: xHCI 1.00, 8 ports, 64 slots - reset OK, 2 port(s) with a device: por
 speed - read by registers only
 ```
 
-It drives nothing on its ports: it is a conformance subject, not a USB stack. On v0.31.0 it is CONFORMANT
+It drives nothing on its ports: it is a conformance subject, not a USB stack. On v0.32.0 it is CONFORMANT
 (simulated), **29 of 29**. `S2.dma` passes because a registers-only driver has no DMA arena.
 
 ## Build and run
@@ -39,7 +39,7 @@ cd examples/xhci
 godspeed check
 godspeed package --local        # every architecture; GODSPEED_SIGNING_KEY=<a seed> to sign it
 gdcs run xhci-gdcs-0.1.0.gsp --platform godspeed-platform.toml \
-    --image godspeed-os-v0.31.0-x86_64.img --source . --out gdcs-run
+    --image godspeed-os-v0.32.0-x86_64.img --source . --out gdcs-run
 ```
 
 The declaration gives QEMU the controller and two devices for it to find: `devices = ["qemu-xhci,id=xhci",
