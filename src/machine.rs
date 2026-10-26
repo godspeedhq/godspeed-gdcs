@@ -7,8 +7,9 @@
 //!
 //! The machine is x86-64 on QEMU's `pc` board: UEFI firmware from QEMU's own `edk2-x86_64-code.fd`, the image on
 //! the legacy IDE controller where the firmware boots it and GodspeedOS does not look for data, a blank data disk
-//! alone on an AHCI controller, an e1000 on QEMU's user network, where the host is 10.0.2.2, and a file chardev
-//! (`gdcs-serial`) for a declared serial device to send to.
+//! alone on an AHCI controller, an e1000 on QEMU's user network, where the host is 10.0.2.2, a silent audio backend
+//! (`gdcs-audio`) for a declared sound device to use, and a file chardev (`gdcs-serial`) for a declared serial
+//! device to send to.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -195,6 +196,10 @@ impl Machine {
             "e1000,netdev=n0",
             "-netdev",
             "user,id=n0",
+            // A silent audio backend, for a declared sound device to use (`hda-output,audiodev=gdcs-audio`).
+            // QEMU's codecs need one; with none declared it is unused, and it never makes a sound.
+            "-audiodev",
+            "none,id=gdcs-audio",
             // A file chardev for a declared serial device to use (`usb-serial,...,chardev=gdcs-serial`): what the
             // device sends lands in `gdcs-serial.out` in the work folder. With none declared it stays empty.
             "-chardev",
