@@ -88,6 +88,17 @@ fn main() -> ExitCode {
                 Ok(x) => x,
                 Err(e) => return fail(&e),
             };
+            // If the driver's gdcs.toml names a target release, it must match the platform file given.
+            if let Some(dir) = &source {
+                match load_declaration(&None, &Some(dir.clone())) {
+                    Err(e) => return fail(&e),
+                    Ok(decl) => {
+                        if let Some(why) = decl.target_mismatch(&platform.os) {
+                            return fail(&why);
+                        }
+                    }
+                }
+            }
             let (subject, results) = gdcs::stage1::check(&name, &file, &platform, source.as_deref());
             let report = Report {
                 format: REPORT_FORMAT,
@@ -123,21 +134,18 @@ fn main() -> ExitCode {
                 Ok(x) => x,
                 Err(e) => return fail(&e),
             };
-            let decl_path = declare.or_else(|| source.as_ref().map(|s| s.join("gdcs.toml")));
-            let decl = match &decl_path {
-                Some(p) if p.exists() => match std::fs::read_to_string(p)
-                    .map_err(|e| e.to_string())
-                    .and_then(|t| gdcs::declare::read(&t))
-                {
-                    Ok(d) => d,
-                    Err(e) => return fail(&format!("{}: {e}", p.display())),
-                },
-                // No declaration: the run goes ahead with no devices added, and Stage 3 says the driver declared nothing.
-                _ => gdcs::declare::Declaration {
-                    format: gdcs::declare::FORMAT,
-                    ..Default::default()
-                },
+            let decl_path = declare
+                .clone()
+                .or_else(|| source.as_ref().map(|s| s.join("gdcs.toml")))
+                .filter(|p| p.exists());
+            let decl = match load_declaration(&declare, &source) {
+                Ok(d) => d,
+                Err(e) => return fail(&e),
             };
+            // If the driver's gdcs.toml names a target release, it must match the platform file given, before boot.
+            if let Some(why) = decl.target_mismatch(&platform.os) {
+                return fail(&why);
+            }
             let Some(firmware) = firmware.or_else(|| gdcs::machine::default_firmware(&qemu)) else {
                 return fail(
                     "no UEFI firmware found beside QEMU (share/edk2-x86_64-code.fd): name one with --firmware",
@@ -288,6 +296,21 @@ fn inputs(platform: &Path, package: &Path) -> Result<(gdcs::platform::Platform, 
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     Ok((p, file, name))
+}
+
+/// The driver's declaration: `--declare`, else `<source>/gdcs.toml`, else an empty declaration. An error is a
+/// gdcs.toml that is present but does not read.
+fn load_declaration(declare: &Option<PathBuf>, source: &Option<PathBuf>) -> Result<gdcs::declare::Declaration, String> {
+    let path = declare.clone().or_else(|| source.as_ref().map(|s| s.join("gdcs.toml")));
+    match path {
+        Some(p) if p.exists() => std::fs::read_to_string(&p)
+            .map_err(|e| format!("{}: {e}", p.display()))
+            .and_then(|t| gdcs::declare::read(&t).map_err(|e| format!("{}: {e}", p.display()))),
+        _ => Ok(gdcs::declare::Declaration {
+            format: gdcs::declare::FORMAT,
+            ..Default::default()
+        }),
+    }
 }
 
 fn target(p: &gdcs::platform::Platform) -> Target {
