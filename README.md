@@ -240,6 +240,28 @@ Welcome, and held to the same bar as any other. GDCS is designed so that an agen
 submit a driver from published interfaces alone, with every failure saying what failed, why and where to look.
 Passing GDCS is evidence, not proof.
 
+## Is GodspeedOS itself tested by GDCS?
+
+Not yet, and here is why.
+
+GodspeedOS came first. The developer CLI, the package registry and GDCS were built after it, out of what
+building it taught: the OS had to exist before anyone could see which tools a contributor would need. So most
+of what ships today was written and tested without them. Its in-tree drivers are services built with the OS
+and tested by its own suites (`osdev test ...`) and on hardware. None of them has been through GDCS.
+
+New work goes through the tools. A driver contributed as a package is built and signed with the CLI, served by
+the registry, and tested by GDCS. The reference drivers in [`examples/`](examples) are tested by GDCS against
+every release they target.
+
+GodspeedOS will move its own code onto the same tools where its design allows. Some parts cannot move without
+a change to the OS itself:
+
+- `console` needs a fixed framebuffer device, which a package cannot request;
+- `hw-enumerator` needs PCI configuration-space access, a privilege no package is given;
+- the USB hosts and `block-driver` are reached by name by the services that depend on them.
+
+The OS will say which parts cannot move yet, and why, rather than leave it to be found.
+
 ## Licence
 
 Apache-2.0 ([`LICENSE`](LICENSE)). Contributions under the Developer Certificate of Origin, AI-assisted ones
