@@ -3,7 +3,7 @@
 **The Godspeed Driver Conformance Suite (GDCS)**: an independent way to test a GodspeedOS driver and to say,
 in a report anyone can check, what was shown, where, and what was not.
 
-> **Status: the Basic and Recovery profiles, in QEMU on x86-64.** `gdcs check` runs Stage 1 on a package file;
+> **Status: the Basic and Recovery profiles, in QEMU on x86-64 and riscv64.** `gdcs check` runs Stage 1 on a package file;
 > `gdcs run` adds Stages 2 and 3 on a release image in QEMU, Stage 2 by two probes GDCS installs and watches -
 > one refused each thing it tries, one read of an ungranted address that the kernel kills it for while staying
 > up. `gdcs run --recovery` adds Stage 4 (MAX CARNAGE) on a second machine: the driver killed over and over,
@@ -130,13 +130,17 @@ Illustrative: the shape of a Recovery report. Recovery (Stage 4) is not built ye
 
 GDCS is a Rust program (`cargo build --release`; the binary is `gdcs`). It needs a driver package and, from the
 [GodspeedOS release](https://github.com/godspeedhq/godspeed-os/releases) it targets, `godspeed-platform.toml` and,
-for `run`, the x86-64 image unpacked from `godspeed-os-<tag>-x86_64.img.zip`.
+for `run`, the image for the machine: on x86-64 the image unpacked from `godspeed-os-<tag>-x86_64.img.zip`, on
+riscv64 (`--arch riscv64`) the QEMU `virt` kernel `godspeed-os-<tag>-riscv64-qemu-virt.elf`. A release ships that
+kernel from the one after v0.31.0; for v0.31.0 itself there is none, and its riscv64 network driver does not drive
+QEMU's e1000, so a riscv64 run needs the next release.
 
 ```
 gdcs check edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver
 gdcs run   edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver \
            --image godspeed-os-v0.31.0-x86_64.img --out gdcs-run
 gdcs run   ... --recovery        # the Recovery profile: also Stage 4 (MAX CARNAGE)
+gdcs run   ... --arch riscv64 --image godspeed-os-<tag>-riscv64-qemu-virt.elf   # on QEMU virt
 ```
 
 - **`check`** is Stage 1 alone, on the file, with no machine. `--source` is the driver's project folder, for the
@@ -145,7 +149,8 @@ gdcs run   ... --recovery        # the Recovery profile: also Stage 4 (MAX CARNA
   would - the data disk formatted with `drives flash`, the package served from this machine and fetched with
   `download`, its key trusted with `godspeed trust add`, `godspeed install` - and watched. It needs
   `qemu-system-x86_64` and the UEFI firmware QEMU ships (`share/edk2-x86_64-code.fd`; `--qemu` and `--firmware`
-  name them otherwise). A run takes a few minutes. `--out` gets `report.txt`, `report.json` and `serial.log`, with
+  name them otherwise), or for `--arch riscv64` `qemu-system-riscv64`, whose `virt` board boots OpenSBI and the
+  kernel and has the data disk as a USB stick on an xHCI (`gdcs-xhci`), since this port keeps its storage on USB. A run takes a few minutes. `--out` gets `report.txt`, `report.json` and `serial.log`, with
   the log's SHA-256 in the report.
 - **`run --recovery`** is the Recovery profile: everything in Basic, then Stage 4 on a SECOND fresh machine - the
   driver killed one past the restart cap, recovered each time and then left down, with the kernel and unrelated
@@ -223,8 +228,20 @@ reference for one shape of driver, and each is CONFORMANT (simulated) on v0.31.0
 Every example is also **built and checked for all four architectures GodspeedOS supports** (x86_64, aarch64,
 armv7, riscv64). CI packages each one for every architecture against the release its `gdcs.toml` names, and
 `gdcs check` verifies each binary is an executable of its machine (the `examples` job). That shows the driver
-builds against the published interfaces on every architecture. It does not show it running there: GDCS runs
-x86-64 QEMU only so far.
+builds against the published interfaces on every architecture.
+
+**Run on riscv64 too** (QEMU `virt`, 2026-10-26, against the OS change that ships the virt kernel and drives the
+e1000 there - not yet released):
+
+| Example | riscv64 result | Why |
+|---|---|---|
+| `e1000` | 28/29, `S2.dma` NOT RUN; Recovery 33/34 | the riscv64 kernel does not say whether it can confine DMA, so the result cannot be read |
+| `usb-serial` | 29/29, CONFORMANT | its device on the disk's xHCI (`[qemu.riscv64]` in its `gdcs.toml`) |
+| `hda` | NOT CONFORMANT, `S2.dma` NOT RUN | riscv64 routes no PCI interrupt to a driver package, and the driver says so: its by-interrupt behaviour cannot happen |
+| `xhci` | not run | its `gdcs.toml` says why: the riscv64 disk is on the xHCI it would take over |
+
+The two gaps are the OS's, found by running: GDCS reports them rather than working around them. Arm (the Raspberry
+Pis) has no network in QEMU on either port, so the examples are built and checked there but not run.
 
 | Example | The shape it shows | Device |
 |---|---|---|

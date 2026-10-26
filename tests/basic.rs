@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 use gdcs::basic::{self, Subject};
 use gdcs::declare::{Behaviour, Declaration, Qemu, FORMAT};
-use gdcs::machine::Config;
+use gdcs::machine::{Board, Config};
 use gdcs::report::{Environment, Outcome, TestResult};
 
 fn env() -> Environment {
@@ -90,6 +90,7 @@ fn qemu_run(tag: &str, case: Case) -> Vec<TestResult> {
         target: Default::default(),
         qemu: Qemu {
             devices: devices.iter().map(|d| d.to_string()).collect(),
+            ..Default::default()
         },
         behaviour: vec![Behaviour {
             id: "works".into(),
@@ -98,9 +99,11 @@ fn qemu_run(tag: &str, case: Case) -> Vec<TestResult> {
         }],
     };
     let cfg = Config {
-        firmware: case
-            .firmware
-            .unwrap_or_else(|| gdcs::machine::default_firmware(&qemu).expect("QEMU's firmware")),
+        board: Board::Pc {
+            firmware: case
+                .firmware
+                .unwrap_or_else(|| gdcs::machine::default_firmware(&qemu).expect("QEMU's firmware")),
+        },
         qemu,
         image,
         work: std::env::temp_dir().join(format!("gdcs-basic-{}-{tag}", std::process::id())),
@@ -435,7 +438,9 @@ fn carnage_on_a_real_machine_is_bounded_and_survivable() {
         godspeed_package::ManifestSignature::parse(sig).unwrap().key.to_string()
     };
     let cfg = Config {
-        firmware: gdcs::machine::default_firmware(&qemu).expect("firmware"),
+        board: Board::Pc {
+            firmware: gdcs::machine::default_firmware(&qemu).expect("firmware"),
+        },
         qemu,
         image,
         work: std::env::temp_dir().join(format!("gdcs-carnage-{}", std::process::id())),

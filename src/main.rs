@@ -37,16 +37,20 @@ enum Command {
         verbose: bool,
     },
     /// The Basic profile: Stage 1, then the driver installed on a release image in QEMU and watched (Stages 2, 3).
-    /// With --recovery, also Stage 4 (MAX CARNAGE) on a second machine. x86-64 only, simulated.
+    /// With --recovery, also Stage 4 (MAX CARNAGE) on a second machine. Simulated: x86-64 `pc` or riscv64 `virt`.
     Run {
         /// The driver package, `<name>-<version>.gsp`.
         package: PathBuf,
         /// The release's `godspeed-platform.toml`.
         #[arg(long)]
         platform: PathBuf,
-        /// The release's x86-64 image, unpacked (`godspeed-os-<tag>-x86_64.img`). It is copied, never written.
+        /// The release's image for the machine: x86-64, `godspeed-os-<tag>-x86_64.img` unpacked; riscv64,
+        /// `godspeed-os-<tag>-riscv64-qemu-virt.elf`. It is copied, never written.
         #[arg(long)]
         image: PathBuf,
+        /// The machine: `x86_64` (QEMU `pc`, UEFI) or `riscv64` (QEMU `virt`, OpenSBI).
+        #[arg(long, default_value = "x86_64")]
+        arch: String,
         /// The driver's project folder: its source for Stage 1, and its `gdcs.toml` unless --declare names another.
         #[arg(long)]
         source: Option<PathBuf>,
@@ -56,10 +60,10 @@ enum Command {
         /// Where the report, its JSON and the serial log are written.
         #[arg(long, default_value = "gdcs-run")]
         out: PathBuf,
-        /// `qemu-system-x86_64`, if it is not on PATH.
-        #[arg(long, default_value = "qemu-system-x86_64")]
-        qemu: PathBuf,
-        /// QEMU's x86-64 UEFI firmware, if it is not beside QEMU (`share/edk2-x86_64-code.fd`).
+        /// The QEMU for the machine, if it is not on PATH (`qemu-system-x86_64`, `qemu-system-riscv64`).
+        #[arg(long)]
+        qemu: Option<PathBuf>,
+        /// x86-64 only: QEMU's UEFI firmware, if it is not beside QEMU (`share/edk2-x86_64-code.fd`).
         #[arg(long)]
         firmware: Option<PathBuf>,
         /// Cores.
@@ -121,6 +125,7 @@ fn main() -> ExitCode {
             package,
             platform,
             image,
+            arch,
             source,
             declare,
             out,
@@ -146,11 +151,31 @@ fn main() -> ExitCode {
             if let Some(why) = decl.target_mismatch(&platform.os) {
                 return fail(&why);
             }
-            let Some(firmware) = firmware.or_else(|| gdcs::machine::default_firmware(&qemu)) else {
-                return fail(
-                    "no UEFI firmware found beside QEMU (share/edk2-x86_64-code.fd): name one with --firmware",
-                );
+            let board = match arch.as_str() {
+                "x86_64" => {
+                    let q = qemu.clone().unwrap_or_else(|| PathBuf::from("qemu-system-x86_64"));
+                    let Some(firmware) = firmware.or_else(|| gdcs::machine::default_firmware(&q)) else {
+                        return fail(
+                            "no UEFI firmware found beside QEMU (share/edk2-x86_64-code.fd): name one with --firmware",
+                        );
+                    };
+                    gdcs::machine::Board::Pc { firmware }
+                }
+                "riscv64" => gdcs::machine::Board::RiscvVirt,
+                other => {
+                    return fail(&format!(
+                        "--arch {other}: GDCS makes an x86_64 machine (QEMU pc) or a riscv64 one (QEMU virt)"
+                    ))
+                }
             };
+            let qemu = qemu.unwrap_or_else(|| PathBuf::from(board.default_qemu()));
+            if let Some(why) = decl.qemu.unsupported_on(board.arch()) {
+                return fail(&format!(
+                    "gdcs.toml says this driver cannot be run on {}: {why}",
+                    board.arch()
+                ));
+            }
+            let declared = decl.qemu.devices_for(board.arch()).to_vec();
             if let Err(e) = std::fs::create_dir_all(&out) {
                 return fail(&format!("{}: {e}", out.display()));
             }
@@ -160,16 +185,20 @@ fn main() -> ExitCode {
             };
 
             let (subject, mut results) = gdcs::stage1::check(&name, &file, &platform, source.as_deref());
-            let devices = if decl.qemu.devices.is_empty() {
+            let devices = if declared.is_empty() {
                 "none".to_string()
             } else {
-                decl.qemu.devices.join(", ")
+                declared.join(", ")
             };
             let env = Environment::Simulated {
                 detail: format!(
-                    "{}, pc board, UEFI, {smp} cores, e1000, AHCI data disk; devices: {devices}; image {} (sha256 {}...)",
+                    "{}, {}, {smp} cores; devices: {devices}; image {} (sha256 {}...)",
                     gdcs::machine::qemu_version(&qemu),
-                    image.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                    board.describe(),
+                    image
+                        .file_name()
+                        .map(|n| n.to_string_lossy().into_owned())
+                        .unwrap_or_default(),
                     &image_bytes_sha[..12]
                 ),
             };
@@ -187,7 +216,7 @@ fn main() -> ExitCode {
                     ));
                 }
             } else {
-                match basic_subject(&file) {
+                match basic_subject(&file, board.arch()) {
                     Err(why) => {
                         results.extend(gdcs::basic::not_run(&env, &why));
                         if recovery {
@@ -205,10 +234,10 @@ fn main() -> ExitCode {
                         };
                         let cfg = gdcs::machine::Config {
                             qemu: qemu.clone(),
-                            firmware,
+                            board,
                             image: image.clone(),
                             work: out.join("machine"),
-                            devices: decl.qemu.devices.clone(),
+                            devices: declared.clone(),
                             smp,
                         };
                         eprintln!(
@@ -243,7 +272,7 @@ fn main() -> ExitCode {
                             // not the device, so the subject does its one-shot work and then is stormed.
                             let carnage_cfg = gdcs::machine::Config {
                                 work: out.join("carnage"),
-                                devices: decl.qemu.devices.clone(),
+                                devices: declared.clone(),
                                 ..cfg.clone()
                             };
                             let behaviour = decl.behaviour.first().map(|b| b.expect.as_str());
@@ -333,7 +362,7 @@ fn target(p: &gdcs::platform::Platform) -> Target {
 
 /// What the machine run needs from a package Stage 1 passed: the key that signed it, and whether it asks for DMA.
 /// An error is why the run cannot go ahead.
-fn basic_subject(file: &[u8]) -> Result<(String, bool), String> {
+fn basic_subject(file: &[u8], arch: &str) -> Result<(String, bool), String> {
     let pkg = gdcs::package::read(file)?;
     let sig = pkg
         .own(godspeed_package::SIGNATURE_FILE)
@@ -343,8 +372,14 @@ fn basic_subject(file: &[u8]) -> Result<(String, bool), String> {
         .map_err(|e| e.to_string())?
         .key
         .to_string();
-    if pkg.own(Arch::X86_64.artifact_file()).is_none() {
-        return Err("the package has no x86_64 binary, and this run's machine is x86-64".to_string());
+    let has = Arch::ALL
+        .into_iter()
+        .find(|a| a.as_str() == arch)
+        .is_some_and(|a| pkg.own(a.artifact_file()).is_some());
+    if !has {
+        return Err(format!(
+            "the package has no {arch} binary, and this run's machine is {arch}"
+        ));
     }
     let contract: toml::Table = pkg
         .own(godspeed_package::CONTRACT_FILE)
