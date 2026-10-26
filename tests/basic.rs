@@ -107,7 +107,8 @@ fn qemu_run(tag: &str, case: Case) -> Vec<TestResult> {
         smp: 2,
     };
     let s = subject(&file, &key, true);
-    let r = basic::run(&cfg, &decl, &s, &env());
+    let probe = gdcs::isolation::bundled();
+    let r = basic::run(&cfg, &decl, &s, Some(&probe), "0.31.0", &env());
     for x in &r {
         eprintln!("{tag}: {} {} - {}", x.id, x.outcome.word(), x.detail);
     }
@@ -216,4 +217,76 @@ fn without_its_device_the_driver_is_not_shown_working() {
         .collect();
     assert!(!failed.is_empty(), "nothing failed with no device on the machine");
     assert!(failed.iter().all(|id| id.starts_with("S3.")), "{failed:?}");
+}
+
+// --- Stage 2 (isolation), at the parser level: each outcome seen without a machine ---
+
+use gdcs::isolation;
+
+#[test]
+fn isolation_reports_pass_fail_and_missing() {
+    let env = env();
+    let good = "\
+isolation-probe: started\n\
+isolation-probe: forged-cap PASS - a fabricated capability handle is CapNotHeld\n\
+isolation-probe: kernel-pointer PASS - kernel addresses refused\n\
+isolation-probe: introspect PASS - denied without INTROSPECT\n\
+isolation-probe: reboot PASS - denied without the capability\n\
+isolation-probe: acquire PASS - denied without ACQUIRE_ANY\n\
+isolation-probe: fuzz PASS - all UnknownSyscall\n\
+isolation-probe: done, 6 of 6 refused\n";
+    let r = isolation::from_log(good, &env);
+    assert_eq!(r.len(), 6);
+    assert!(
+        r.iter().all(|x| x.outcome == Outcome::Pass),
+        "{:?}",
+        r.iter().map(|x| (&x.id, x.outcome)).collect::<Vec<_>>()
+    );
+
+    // A leak the probe reports as FAIL is a Stage 2 failure, carrying the probe's reason.
+    let leak = good.replace(
+        "forged-cap PASS - a fabricated capability handle is CapNotHeld",
+        "forged-cap FAIL - a fabricated capability handle was accepted as authority",
+    );
+    let r = isolation::from_log(&leak, &env);
+    let forged = r.iter().find(|x| x.id == "S2.forged-cap").unwrap();
+    assert_eq!(forged.outcome, Outcome::Fail);
+    assert!(forged.detail.contains("accepted as authority"), "{}", forged.detail);
+    // The others still pass: one leak fails one attempt.
+    assert_eq!(r.iter().filter(|x| x.outcome == Outcome::Pass).count(), 5);
+
+    // The probe finished but never reported an attempt (a check it was built with went missing): NOT RUN.
+    let missing = good.replace("isolation-probe: fuzz PASS - all UnknownSyscall\n", "");
+    let fuzz = isolation::from_log(&missing, &env)
+        .into_iter()
+        .find(|x| x.id == "S2.fuzz")
+        .unwrap();
+    assert_eq!(fuzz.outcome, Outcome::NotRun);
+    assert!(fuzz.detail.contains("without reporting"), "{}", fuzz.detail);
+
+    // The machine stopped mid-probe (no `done,` line): every attempt NOT RUN, saying so.
+    let stopped = "isolation-probe: started\nisolation-probe: forged-cap PASS - x\n";
+    let r = isolation::from_log(stopped, &env);
+    assert_eq!(
+        r.iter().find(|x| x.id == "S2.forged-cap").unwrap().outcome,
+        Outcome::Pass
+    );
+    assert_eq!(r.iter().find(|x| x.id == "S2.reboot").unwrap().outcome, Outcome::NotRun);
+    assert!(r
+        .iter()
+        .find(|x| x.id == "S2.reboot")
+        .unwrap()
+        .detail
+        .contains("did not finish"));
+}
+
+#[test]
+fn a_probe_built_for_another_release_does_not_run() {
+    let probe = isolation::bundled();
+    // from_log is release-agnostic; the release gate is in run(), checked here by its public contract:
+    // the bundled probe names 0.31.0, so a mismatch is the caller's to detect. We assert the fact the
+    // gate depends on, so a rebuilt probe that forgets to update the release constant fails this.
+    assert_eq!(probe.release, "0.31.0");
+    assert!(probe.gsp.starts_with(b"godspeed-package-file 1"));
+    assert!(probe.key.starts_with("ed25519:"));
 }

@@ -4,9 +4,12 @@
 names it; everything else is a requirement on GDCS, not a description of it.
 
 **What is built (2026-10-26), and what is not.** Stage 1 in full, offline (`gdcs check`), and the Basic profile on
-x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and Stage 2 as far as the machine shows
-it without an attempt - the grant, and whether DMA can be confined. Each check has been seen to fail. **Not built:**
-the isolation probe that makes Stage 2's attempts (so a Basic run is INCOMPLETE until it is), the other
+x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and Stage 2 by an isolation probe
+(`fixtures/isolation-probe`) that attempts, and is refused, the things an isolated service must not do - a
+fabricated capability, a kernel-space pointer to a syscall, a gated query, the machine's power, a send capability
+to a non-peer, a guess past the syscall surface - plus the grant and whether DMA can be confined. Each check has
+been seen to fail. **Not built:** the probe's pure MMU-fault attempts (dereferencing unmapped MMIO or another
+service's memory, which kill the caller rather than returning an error - see Stage 2 below), the other
 architectures, physical hardware, Stages 4 and 5, and the CLI commands of section 7. The README says how to run
 what is built.
 
@@ -141,6 +144,19 @@ The driver cannot:
 - widen its authority through malformed requests to the supervisor, its host or any peer.
 
 Each is shown by the driver, or a probe in its place, attempting it and the system refusing it.
+
+**As built (2026-10-26): GDCS's own isolation probe (`fixtures/isolation-probe`).** It is an ordinary service
+holding nothing but `log_write`, installed like any package, that on startup attempts each unauthorized thing
+using only the published SDK (no kernel interface a driver could not use, section 11) and logs whether it was
+refused. GDCS reads those lines. The attempts a running service can make and SURVIVE to report are shown this
+way: a fabricated capability (`CapNotHeld`), a kernel-space or null pointer handed to a syscall (rejected at the
+user-pointer check, the caller surviving), a gated query without `INTROSPECT`, `Reboot`/`PowerOff` without the
+capability, `AcquireSendCap` to a non-peer without `ACQUIRE_ANY`, and thousands of out-of-range syscall numbers
+(each `UnknownSyscall`, no crash). **Recorded, not yet built (CLAUDE.md 26.7):** the pure MMU faults -
+dereferencing an unmapped MMIO address or another service's memory directly - kill the caller rather than
+returning an error, so a service cannot report them, and a deliberate one would restart-loop a managed package.
+The kernel-pointer attempt shows the syscall boundary rejecting such addresses; the MMU-enforced dereference
+fault is what GodspeedOS's own `CLAUDE.md` 22 (A15/P7) pins on every release, and GDCS does not re-show it.
 
 **DMA, honestly.** On a machine whose IOMMU does not confine the device, "cannot reach memory outside its arena"
 cannot be enforced and is not tested: the report says `NOT ENFORCEABLE ON THIS MACHINE` and names the machine.

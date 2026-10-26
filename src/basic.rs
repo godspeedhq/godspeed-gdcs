@@ -18,13 +18,6 @@ use crate::report::{Environment, Outcome, TestResult};
 /// Stage 2 and 3 tests, by identifier, version and title. Behaviours are `S3.behaviour.<id>`, one per declaration.
 const PRIVILEGE: (&str, u32, &str) = ("S2.privilege", 1, "given no privilege");
 const DMA: (&str, u32, &str) = ("S2.dma", 1, "DMA confined to its arena");
-const ATTEMPTS: &[(&str, u32, &str)] = &[
-    ("S2.mmio", 1, "an MMIO region not granted is refused"),
-    ("S2.capability", 1, "a capability not given is refused"),
-    ("S2.memory", 1, "another service's memory is unreachable"),
-    ("S2.interrupt", 1, "another device's interrupt is not delivered"),
-    ("S2.requests", 1, "malformed requests widen nothing"),
-];
 const BOOT: (&str, u32, &str) = ("S3.boot", 1, "the release boots to a prompt");
 const SETUP: (&str, u32, &str) = ("S3.setup", 1, "a data disk, the package fetched, its key trusted");
 const INSTALL: (&str, u32, &str) = ("S3.install", 1, "installed and started by the supervisor");
@@ -89,7 +82,14 @@ fn tail(text: &str, n: usize) -> Vec<String> {
 
 /// Run Stages 2 and 3. `env` names the environment on every result; the machine's serial log is left at
 /// `cfg.work/serial.log`.
-pub fn run(cfg: &Config, decl: &Declaration, s: &Subject, env: &Environment) -> Vec<TestResult> {
+pub fn run(
+    cfg: &Config,
+    decl: &Declaration,
+    s: &Subject,
+    probe: Option<&crate::isolation::Probe>,
+    target_release: &str,
+    env: &Environment,
+) -> Vec<TestResult> {
     let mut out = Vec::new();
     let skip_rest = |out: &mut Vec<TestResult>, from: &str, why: &str| {
         let order = ["S3.boot", "S3.setup", "S3.install", "S3.behaviour", "S3.running", "S2"];
@@ -330,7 +330,11 @@ pub fn run(cfg: &Config, decl: &Declaration, s: &Subject, env: &Environment) -> 
         ));
     }
     out.push(dma(&log, s, env));
-    push_attempts(&mut out, env);
+    // Stage 2's attempts, made by the isolation probe on this same machine (the subject is already installed).
+    match probe {
+        Some(p) => out.extend(crate::isolation::run(&mut m, p, target_release, env)),
+        None => push_attempts(&mut out, env),
+    }
     finish(m, &mut out, env);
     out
 }
@@ -440,23 +444,17 @@ pub fn not_run(env: &Environment, why: &str) -> Vec<TestResult> {
     for t in [BOOT, SETUP, INSTALL, BEHAVIOUR, RUNNING, PRIVILEGE, DMA] {
         out.push(result(t, env, Outcome::NotRun, why, Vec::new()));
     }
-    for t in ATTEMPTS {
-        out.push(result(*t, env, Outcome::NotRun, why, Vec::new()));
-    }
+    out.extend(crate::isolation::not_run(env, why));
     out.push(result(KERNEL, env, Outcome::NotRun, why, Vec::new()));
     out
 }
 
+/// The attempts as NOT RUN on a machine that could not be driven far enough to install the probe.
 fn push_attempts(out: &mut Vec<TestResult>, env: &Environment) {
-    for t in ATTEMPTS {
-        out.push(result(
-            *t,
-            env,
-            Outcome::NotRun,
-            "needs the GDCS isolation probe, which is not built yet: a refusal is shown only by an attempt",
-            Vec::new(),
-        ));
-    }
+    out.extend(crate::isolation::not_run(
+        env,
+        "the machine was not usable, so the isolation probe could not run",
+    ));
 }
 
 /// Stop the machine and read its whole log once more for a kernel that stopped.

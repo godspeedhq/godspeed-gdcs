@@ -1,0 +1,15 @@
+# The isolation probe's contract. It REQUESTS almost nothing - `log_write`, to report what happened, and
+# nothing else - which is the whole point: everything it tries below, it was never granted, and the system
+# must refuse each attempt. GDCS installs it like any package and reads the lines it logs.
+#
+# It is GDCS's own test fixture, not a model driver: it reaches `godspeed_sdk::adversarial` to issue raw and
+# malformed syscalls, which `gdcs check` reports as an SDK-use FINDING. That is expected here.
+name    = "isolation-probe"
+version = "0.1.0"
+
+[resources.memory]
+request = "32MiB"
+limit   = "32MiB"
+
+[capabilities]
+log_write = true   # write lines to the kernel log - and nothing else

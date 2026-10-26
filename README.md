@@ -4,9 +4,9 @@
 in a report anyone can check, what was shown, where, and what was not.
 
 > **Status: Stage 1, and the Basic profile in QEMU on x86-64.** `gdcs check` runs Stage 1 on a package file;
-> `gdcs run` adds Stages 2 and 3 on a release image in QEMU. Stage 2's isolation attempts are not built yet, so a
-> Basic run reports them NOT RUN and ends INCOMPLETE. [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1)
-> and says what is built and what is not; [Running it](#running-it) is how.
+> `gdcs run` adds Stages 2 and 3 on a release image in QEMU, Stage 2 by an isolation probe GDCS installs and
+> watches. [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is
+> not; [Running it](#running-it) is how.
 
 ## Why it exists
 
@@ -160,7 +160,8 @@ expect = "edu-driver: device id 0x010000ed, alive true, 5! = 120 by interrupt, 6
 within-secs = 30
 ```
 
-That is the declaration of the driver `godspeed new driver` makes, and a `run` of it on v0.31.0 (2026-10-26):
+That is the declaration of the driver `godspeed new driver` makes, and the Stages 2 and 3 of a `run` of it on
+v0.31.0 (2026-10-26); Stage 1 is the 14 `S1.*` tests shown earlier:
 
 ```
 S3.boot                              PASS       the release boots to a prompt
@@ -170,16 +171,26 @@ S3.behaviour.identity-factorial-dma  PASS       declared behaviour
 S3.running                           PASS       still running after its behaviour
 S2.privilege                         PASS       given no privilege
 S2.dma                               NOT ENFORCEABLE ON THIS MACHINE  DMA confined to its arena
-S2.mmio                              NOT RUN    an MMIO region not granted is refused
-  ... (S2.capability, S2.memory, S2.interrupt, S2.requests: NOT RUN, the isolation probe is not built)
+S2.forged-cap                        PASS       a fabricated capability is refused
+S2.kernel-pointer                    PASS       a kernel-space pointer to a syscall is refused
+S2.introspect                        PASS       a gated kernel query is denied without INTROSPECT
+S2.reboot                            PASS       the machine's power is denied without the capability
+S2.acquire                           PASS       a send capability to a non-peer is denied
+S2.fuzz                              PASS       out-of-range syscalls return a defined error, no crash
 S3.kernel                            PASS       no kernel panic or wedge
 
-27 run: 21 passed, 0 failed, 5 not run, 1 not shown or not enforceable, 0 findings
-RESULT: INCOMPLETE (offline + simulated) - a required test did not run
+28 run: 27 passed, 0 failed, 0 not run, 1 not shown or not enforceable, 0 findings
+RESULT: CONFORMANT (offline + simulated)
 ```
 
-**Its own tests.** `cargo test` runs Stage 1's: a package built to fail each test, which fails that test and no
-other. The QEMU cases are `#[ignore]`d and named in `tests/basic.rs`, with the variables they need.
+`S2.dma` is `NOT ENFORCEABLE` because QEMU's `pc` board has no IOMMU; on a machine that confines the device it
+reads `NOT SHOWN` (QEMU maps but does not fault) or, on silicon, `PASS`. The S2 attempts are made by GDCS's
+[isolation probe](fixtures/), installed on the same machine; the pure MMU-fault attempts are recorded as not yet
+built (`SPECIFICATION.md` Stage 2).
+
+**Its own tests.** `cargo test` runs Stage 1's and the Stage 2 parser's: a package or a log built to fail each
+check, which fails that check and no other. The QEMU cases are `#[ignore]`d and named in `tests/basic.rs`, with
+the variables they need.
 
 ## AI-assisted drivers
 

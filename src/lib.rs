@@ -8,6 +8,7 @@
 
 pub mod basic;
 pub mod declare;
+pub mod isolation;
 pub mod machine;
 pub mod package;
 pub mod platform;
