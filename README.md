@@ -152,11 +152,15 @@ gdcs run   ... --recovery        # the Recovery profile: also Stage 4 (MAX CARNA
   services (shell, `fs`, `net-stack`) still working afterward. It keeps a `serial-carnage.log` beside the rest.
 - Exit status: 0 conformant, 1 not conformant, 3 incomplete (a required test did not run), 2 the run could not start.
 
-**The driver's declaration**, `gdcs.toml` in its project folder, says what the driver claims to do and what QEMU must
-give it. A functional pass covers only what is declared; a driver that declares nothing is a probe, and says so.
+**The driver's declaration**, `gdcs.toml` in its project folder, says which release the driver is for, what it
+claims to do, and what QEMU must give it. A functional pass covers only what is declared; a driver that declares
+nothing is a probe, and says so.
 
 ```toml
 format = 1
+
+[target]
+os = "0.31.0"                 # the GodspeedOS release this driver is built and tested against
 
 [qemu]
 devices = ["edu"]
@@ -166,6 +170,12 @@ id = "identity-factorial-dma"
 expect = "edu-driver: device id 0x010000ed, alive true, 5! = 120 by interrupt, 64 bytes through DMA and back intact"
 within-secs = 30
 ```
+
+`[target].os` is optional and declarative: GDCS checks it against the platform file and image you pass (and the
+bundled probe) and refuses to start on a mismatch, so a run against the wrong release is caught before anything
+boots rather than misread as a driver fault. It does not fetch anything; you still supply the platform file and
+image. This is what makes a dogfood sweep - the same driver, `gdcs run ./that-driver`, against the release its
+own config names - one command per driver.
 
 That is the declaration of the driver `godspeed new driver` makes, and the Stages 2 and 3 of a `run` of it on
 v0.31.0 (2026-10-26); Stage 1 is the 14 `S1.*` tests shown earlier:

@@ -87,6 +87,7 @@ fn qemu_run(tag: &str, case: Case) -> Vec<TestResult> {
     let devices = case.devices.unwrap_or(&["edu"]);
     let decl = Declaration {
         format: FORMAT,
+        target: Default::default(),
         qemu: Qemu {
             devices: devices.iter().map(|d| d.to_string()).collect(),
         },
