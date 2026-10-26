@@ -230,18 +230,22 @@ armv7, riscv64). CI packages each one for every architecture against the release
 `gdcs check` verifies each binary is an executable of its machine (the `examples` job). That shows the driver
 builds against the published interfaces on every architecture.
 
-**Run on riscv64 too** (QEMU `virt`, 2026-10-26, against the OS change that ships the virt kernel and drives the
-e1000 there - not yet released):
+**Run on riscv64 too** (QEMU `virt`, 2026-10-26, every one with `--recovery`, against the OS change that ships
+the virt kernel - not yet released):
 
-| Example | riscv64 result | Why |
-|---|---|---|
-| `e1000` | 28/29, `S2.dma` NOT RUN; Recovery 33/34 | the riscv64 kernel does not say whether it can confine DMA, so the result cannot be read |
-| `usb-serial` | 29/29, CONFORMANT | its device on the disk's xHCI (`[qemu.riscv64]` in its `gdcs.toml`) |
-| `hda` | NOT CONFORMANT, `S2.dma` NOT RUN | riscv64 routes no PCI interrupt to a driver package, and the driver says so: its by-interrupt behaviour cannot happen |
-| `xhci` | not run | its `gdcs.toml` says why: the riscv64 disk is on the xHCI it would take over |
+| Example | riscv64 result |
+|---|---|
+| `e1000` | CONFORMANT, 33/34 (`S2.dma` not enforceable: this port has no IOMMU, and says so at boot) |
+| `hda` | CONFORMANT, 33/34, its codec answered by interrupt on every hart a respawn landed on (`--smp 4`) |
+| `usb-serial` | CONFORMANT, 34/34; its device on the disk's xHCI (`[qemu.riscv64]` in its `gdcs.toml`) |
+| `xhci` | not run - its `gdcs.toml` says why: the riscv64 disk is on the xHCI it would take over |
 
-The two gaps are the OS's, found by running: GDCS reports them rather than working around them. Arm (the Raspberry
-Pis) has no network in QEMU on either port, so the examples are built and checked there but not run.
+Running them found three gaps in the OS on this port, now closed in the same change: the network driver did not
+drive the e1000, no PCI interrupt reached a driver package (riscv64 had no PLIC driver; it has one now), and the
+machine never said whether it could confine DMA. That is what GDCS is for.
+
+Arm (the Raspberry Pis) has no network in QEMU on either port, so the examples are built and checked there but not
+run.
 
 | Example | The shape it shows | Device |
 |---|---|---|

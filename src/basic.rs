@@ -424,7 +424,9 @@ pub fn dma(log: &str, s: &Subject, env: &Environment) -> TestResult {
             Vec::new(),
         );
     }
-    let none = lines_with(log, "iommu: no IVRS table");
+    // x86 says it when the firmware describes no IOMMU; riscv64 says it because it has no IOMMU driver.
+    let mut none = lines_with(log, "iommu: no IVRS table");
+    none.extend(lines_with(log, "iommu: none on this port"));
     if !none.is_empty() {
         return result(
             DMA,
