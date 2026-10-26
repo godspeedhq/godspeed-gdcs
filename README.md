@@ -217,6 +217,11 @@ S4.kernel                            PASS       no kernel panic or wedge under c
 RESULT: CONFORMANT (offline + simulated)
 ```
 
+**A real driver to try it on.** [`examples/e1000`](examples/e1000) is a driver package for QEMU's e1000 NIC
+(reset, link, MAC, one frame sent by DMA), CONFORMANT (simulated) on v0.31.0. It is the first real driver run
+through GDCS, and it found the gap PR #7 fixed: a driver that takes the network away used to stop GDCS
+fetching its probes.
+
 **Its own tests.** `cargo test` runs Stage 1's, the Stage 2 parser's, and Stage 4's: a package or a log built to
 fail each check, which fails that check and no other. The QEMU cases are `#[ignore]`d and named in
 `tests/basic.rs`, with the variables they need.
