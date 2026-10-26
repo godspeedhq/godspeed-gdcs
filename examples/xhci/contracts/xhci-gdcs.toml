@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# The driver's contract: what it REQUESTS, the device among it. It grants nothing. The operator approves
+# the device at `godspeed install`, and the OS finds WHICH device that is on its own bus scan: a contract
+# names a kind of device, never an address.
+# Format: contracts/schema/service.schema.json in GodspeedOS. `godspeed check` validates against it.
+name    = "xhci-gdcs"
+version = "0.1.0"
+
+[resources.memory]
+request = "16MiB"
+limit   = "16MiB"
+
+[capabilities]
+log_write = true      # write lines to the kernel log
+# The device, by what the PCI bus says it is: class 0c:03:30, an xHCI USB host controller (QEMU's `qemu-xhci`). Taking
+# it stops GodspeedOS's `xhci` for it while this package is installed.
+hw_pci_class = "0c0330"
+hw_pci_bar   = 0      # its registers are in BAR 0
+# No interrupt and no DMA arena: this driver reads and writes registers only, which is the point of the example.
