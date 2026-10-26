@@ -173,6 +173,11 @@ pub fn run(
         }
     }
 
+    // Fetch the Stage 2 probes now, while the network is up: a driver under test that claims the network
+    // device takes `download` away when it installs below, and probe install (next) is offline from these
+    // files. The outcome is used at the Stage 2 step.
+    let probe_fetch = probe.map(|p| crate::isolation::fetch_all(&mut m, p, target_release));
+
     // Install. `yes` answers every question, and is what was approved: the device and, asked separately, DMA.
     let from = m.len();
     let installed = m.command(&format!("godspeed install {} yes", s.file_name), 300);
@@ -330,14 +335,19 @@ pub fn run(
         ));
     }
     out.push(dma(&log, s, env));
-    // Stage 2's attempts, made by GDCS's probes on this same machine (the subject is already installed): the
-    // survivable ones (reported by the probe), then the kill-the-caller one (reported by its death).
-    match probe {
-        Some(p) => {
+    // Stage 2's attempts, from the probe files fetched before the subject was installed: the survivable ones
+    // (reported by the probe), then the kill-the-caller one (reported by its death). A fetch that failed makes
+    // all of Stage 2 NOT RUN, saying why.
+    match (probe, probe_fetch) {
+        (Some(p), Some(Ok(()))) => {
             out.extend(crate::isolation::run(&mut m, &p.survivable, target_release, env));
             out.push(crate::isolation::run_fault(&mut m, &p.fault, target_release, env));
         }
-        None => {
+        (_, Some(Err(why))) => {
+            out.extend(crate::isolation::not_run(env, &why));
+            out.push(crate::isolation::fault_not_run(env, &why));
+        }
+        _ => {
             push_attempts(&mut out, env);
             out.push(crate::isolation::fault_not_run(
                 env,

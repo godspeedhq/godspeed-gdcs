@@ -203,29 +203,60 @@ pub fn fault_not_run(env: &Environment, why: &str) -> TestResult {
     result(UNMAPPED.0, UNMAPPED.1, env, Outcome::NotRun, why, Vec::new())
 }
 
-/// Place a probe on a running machine the way an operator does: trust its key for `gdcs`, download it from a
-/// host file server, and install it. Returns the log cursor just before the install (so the caller reads only
-/// what the probe produced), or one sentence saying where it stopped. `label` names the probe for the messages.
-fn place_probe(m: &mut Machine, probe: &Probe, file_name: &str, label: &str) -> Result<usize, String> {
-    if m.type_line(&format!("godspeed trust add gdcs {}", probe.key)).is_err() || m.wait_for("[y/N]", 60).is_none() {
-        return Err(format!("could not reach the trust prompt for the {label} key"));
+/// The on-disk file names the probes are downloaded to and installed from.
+const ISOLATION_FILE: &str = "isolation-probe.gsp";
+const FAULT_FILE: &str = "mmu-fault-probe.gsp";
+
+/// Fetch both probe packages onto the machine, the way an operator does: trust the fixtures key for `gdcs`
+/// once, then download each `.gsp`. This is done BEFORE the driver under test is installed, while the network
+/// is still up - a driver that claims the network device takes `download` away, so a NIC driver's probes could
+/// not be fetched afterward (found dogfooding the e1000 driver). Install is offline, from the files left here.
+/// `Err` is one sentence saying where it stopped, or that the probes are built for another release.
+pub fn fetch_all(m: &mut Machine, probes: &Probes, target_release: &str) -> Result<(), String> {
+    if probes.survivable.release != target_release {
+        return Err(format!(
+            "the bundled probes are built for {}, and this run targets {}: rebuild fixtures/isolation-probe and \
+             fixtures/mmu-fault-probe against {} (fixtures/README.md)",
+            probes.survivable.release, target_release, target_release
+        ));
+    }
+    if m.type_line(&format!("godspeed trust add gdcs {}", probes.survivable.key))
+        .is_err()
+        || m.wait_for("[y/N]", 60).is_none()
+    {
+        return Err("could not reach the trust prompt for the probes' key".to_string());
     }
     if !m
         .command("y", 60)
         .map(|o| o.contains("trusted by this machine's operator"))
         .unwrap_or(false)
     {
-        return Err(format!("the {label} key was not trusted"));
+        return Err("the probes' key was not trusted".to_string());
     }
-    let server = FileServer::start(file_name, probe.gsp.to_vec())
-        .map_err(|e| format!("the host's file server for the {label}: {e}"))?;
+    download(m, ISOLATION_FILE, probes.survivable.gsp)?;
+    download(m, FAULT_FILE, probes.fault.gsp)?;
+    Ok(())
+}
+
+/// Download one `.gsp` from a host file server onto the machine.
+fn download(m: &mut Machine, file_name: &str, bytes: &[u8]) -> Result<(), String> {
+    let server = FileServer::start(file_name, bytes.to_vec())
+        .map_err(|e| format!("the host's file server for {file_name}: {e}"))?;
     if !m
         .command(&format!("download {}", server.link()), 180)
         .map(|o| o.contains("saved"))
         .unwrap_or(false)
     {
-        return Err(format!("the {label} package did not download onto the machine"));
+        return Err(format!(
+            "{file_name} did not download onto the machine (is the driver under test holding the network device?)"
+        ));
     }
+    Ok(())
+}
+
+/// Install an already-downloaded probe from disk (no network) and wait for the supervisor to start it. Returns
+/// the log cursor just before the install, so the caller reads only what the probe produced.
+fn install_from_disk(m: &mut Machine, file_name: &str, label: &str) -> Result<usize, String> {
     let from = m.len();
     if m.command(&format!("godspeed install {file_name} yes"), 300).is_none() {
         return Err(format!(
@@ -251,7 +282,7 @@ pub fn run(m: &mut Machine, probe: &Probe, target_release: &str, env: &Environme
             ),
         );
     }
-    let from = match place_probe(m, probe, "isolation-probe.gsp", "isolation-probe") {
+    let from = match install_from_disk(m, ISOLATION_FILE, "isolation-probe") {
         Ok(from) => from,
         Err(why) => return not_run(env, &why),
     };
@@ -348,7 +379,7 @@ pub fn run_fault(m: &mut Machine, probe: &Probe, target_release: &str, env: &Env
             Vec::new(),
         );
     }
-    let from = match place_probe(m, probe, "mmu-fault-probe.gsp", "mmu-fault-probe") {
+    let from = match install_from_disk(m, FAULT_FILE, "mmu-fault-probe") {
         Ok(from) => from,
         Err(why) => return result(id, title, env, Outcome::NotRun, why, Vec::new()),
     };
