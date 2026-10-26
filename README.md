@@ -225,6 +225,7 @@ reference for one shape of driver, and each is CONFORMANT (simulated) on v0.31.0
 | [`e1000`](examples/e1000) | PCI network card: reset, link, MAC, one frame sent by DMA | QEMU `e1000` |
 | [`hda`](examples/hda) | PCI device driven through DMA command rings, answered by interrupt | QEMU `intel-hda` |
 | [`usb-serial`](examples/usb-serial) | USB device driver: every transfer a request to its host | QEMU `usb-serial` (FTDI) |
+| [`xhci`](examples/xhci) | host controller, brought up by registers alone (no interrupt, no DMA) | QEMU `qemu-xhci` |
 
 The e1000 was the first real driver run through GDCS, and it found the gap PR #7 fixed: a driver that takes
 the network away used to stop GDCS fetching its probes.
