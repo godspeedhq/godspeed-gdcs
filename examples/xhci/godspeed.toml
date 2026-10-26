@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# Godspeed project manifest. It says what kind of project this is, where its contract is, and what a
+# package of it says about itself. Name, version, the authority the driver requests and the device it
+# drives live in the contract, not here.
+format   = 1
+kind     = "driver"
+contract = "contracts/xhci-gdcs.toml"
+
+description = "GDCS example: a USB host controller (xHCI) brought up by its registers alone - reset, version, ports, and which ports have a device"
+
+# The namespace a package of this driver is published under: "alice" makes it alice/xhci-gdcs.
+# `godspeed package` needs it.
+publisher = "gdcs"
+license   = "Apache-2.0"

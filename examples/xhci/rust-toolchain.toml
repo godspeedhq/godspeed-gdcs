@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# The compiler GodspeedOS v0.31.0 is built with. Keep it equal to the OS's own pin:
+# `godspeed check` and `godspeed build` refuse a mismatch.
+[toolchain]
+channel = "nightly-2026-05-16"
+targets = ["x86_64-unknown-none", "armv7a-none-eabi", "aarch64-unknown-none", "riscv64imac-unknown-none-elf"]
