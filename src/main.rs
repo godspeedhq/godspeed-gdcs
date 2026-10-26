@@ -227,6 +227,16 @@ fn main() -> ExitCode {
                                 });
                             }
                         }
+                        // What a declared serial device sent (the `gdcs-serial` chardev), when it sent anything.
+                        let wire = gdcs::machine::SERIAL_DEVICE_OUT;
+                        if let Ok(b) = std::fs::read(cfg.work.join(wire)) {
+                            if !b.is_empty() && std::fs::write(out.join(wire), &b).is_ok() {
+                                logs.push(LogFile {
+                                    name: wire.to_string(),
+                                    sha256: hex(&Sha256Digest::of(&b).0),
+                                });
+                            }
+                        }
                         if recovery {
                             // Stage 4 on its OWN fresh machine, so the restart cap starts at zero and the
                             // storm interferes with nothing else. No extra QEMU devices: the carnage is kills,

@@ -1,1 +1,4 @@
 target/
+# Packages built from an example; examples commit source only. (fixtures/*.gsp ARE tracked: the bundled probes.)
+examples/**/*.gsp
+examples/**/target/
