@@ -3,8 +3,8 @@
 **Status:** draft 0.1, 2026-10-24. Where this document names something GodspeedOS already has, it says so and
 names it; everything else is a requirement on GDCS, not a description of it.
 
-**What is built (2026-10-26), and what is not.** Stage 1 in full, offline (`gdcs check`), and the Basic profile on
-x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and Stage 2 by two probes - one that
+**What is built (2026-10-26), and what is not.** Stage 1 in full, offline (`gdcs check`), and the Basic profile in
+QEMU (`gdcs run`) on x86-64 and, with `--arch riscv64`, on riscv64's `virt` board: Stage 3 for the behaviour a driver declares, and Stage 2 by two probes - one that
 attempts and is refused the things an isolated service must not do (a fabricated capability, a kernel-space
 pointer to a syscall, a gated query, the machine's power, a send capability to a non-peer, a guess past the
 syscall surface), and one that reads an address it was never granted and is killed by the kernel while the

@@ -3,7 +3,7 @@
 
 Packages GDCS ships to run against a release. Each says how it was made, so it can be made again.
 
-## `isolation-probe/` and `isolation-probe-<release>-x86_64.gsp`
+## `isolation-probe/` and `isolation-probe-<release>.gsp`
 
 GDCS's Stage 2 fixture (SPECIFICATION.md 4, Stage 2). `isolation-probe/` is its source - an ordinary service
 that holds nothing but `log_write` and, on startup, tries the things an isolated service must not be able to do
@@ -12,7 +12,7 @@ power, mint a send capability to a non-peer, guess past the syscall surface), lo
 `gdcs run` installs it like any package and reads those lines. The `.gsp` is the built, signed package, bundled
 into the `gdcs` binary (`include_bytes!`) so a run needs no build step; one per release it is built for.
 
-## `mmu-fault-probe/` and `mmu-fault-probe-<release>-x86_64.gsp`
+## `mmu-fault-probe/` and `mmu-fault-probe-<release>.gsp`
 
 GDCS's other Stage 2 fixture: the attempt that KILLS the caller. `mmu-fault-probe/` is a service that, on
 startup, announces and then reads address `0x0` - an address it was never granted, like any unmapped MMIO or
@@ -30,12 +30,14 @@ seed (secret):  1111111111111111111111111111111111111111111111111111111111111111
 public key:     ed25519:d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737
 ```
 
-Built and signed with the developer CLI, against the release named in the file:
+Built and signed with the developer CLI, for every architecture, against the release named in the file. Leave
+`GODSPEED_OS` unset: a probe depends on the SDK by the release's tag as well as on `godspeed`, and a local OS checkout
+replaces only the second, which links two SDKs.
 
 ```
 cd isolation-probe
-GODSPEED_SIGNING_KEY=<the seed> godspeed package --arch x86_64 --local
-# then rename target/package's .gsp to isolation-probe-<release>-x86_64.gsp here
+GODSPEED_SIGNING_KEY=<the seed> godspeed package --local
+# then rename isolation-probe-0.1.0.gsp to ../isolation-probe-<release>.gsp
 ```
 
 **Rebuild it for a new release.** The bundled package is built for one GodspeedOS release (its name is in the file

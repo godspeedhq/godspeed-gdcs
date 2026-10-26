@@ -33,10 +33,10 @@ pub struct Probe {
 /// The GDCS fixtures' throwaway signing key (fixtures/README.md). The run trusts it for `gdcs` and leaves it.
 const FIXTURE_KEY: &str = "ed25519:d04ab232742bb4ab3a1368bd4615e4e6d0224ab71a016baf8520a332c9778737";
 
-/// The survivable-attempts probe compiled into this binary (`fixtures/isolation-probe-<release>-x86_64.gsp`).
+/// The survivable-attempts probe compiled into this binary (`fixtures/isolation-probe-<release>.gsp`).
 pub fn bundled() -> Probe {
     Probe {
-        gsp: include_bytes!("../fixtures/isolation-probe-0.31.0-x86_64.gsp"),
+        gsp: include_bytes!("../fixtures/isolation-probe-0.31.0.gsp"),
         release: "0.31.0",
         key: FIXTURE_KEY,
     }
@@ -58,11 +58,11 @@ pub fn bundled_probes() -> Probes {
     }
 }
 
-/// The kill-the-caller probe (`fixtures/mmu-fault-probe-<release>-x86_64.gsp`): it reads an address it was never
+/// The kill-the-caller probe (`fixtures/mmu-fault-probe-<release>.gsp`): it reads an address it was never
 /// granted, and its death is the evidence (`run_fault`).
 pub fn bundled_fault() -> Probe {
     Probe {
-        gsp: include_bytes!("../fixtures/mmu-fault-probe-0.31.0-x86_64.gsp"),
+        gsp: include_bytes!("../fixtures/mmu-fault-probe-0.31.0.gsp"),
         release: "0.31.0",
         key: FIXTURE_KEY,
     }

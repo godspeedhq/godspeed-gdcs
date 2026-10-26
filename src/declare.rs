@@ -13,6 +13,10 @@
 //! [qemu]
 //! devices = ["edu"]                 # what `-device` QEMU is given, beyond the disks and the network card
 //!
+//! [qemu.riscv64]                    # optional, per board: replaces `devices` on that machine
+//! devices = ["edu"]
+//! # unsupported = "why"             # ...or says the driver cannot be run there, and why
+//!
 //! [[behaviour]]
 //! id = "identity-factorial-dma"     # lowercase, digits and hyphens
 //! expect = "edu-driver: device id 0x010000ed, alive true, 5! = 120 by interrupt, 64 bytes through DMA and back intact"
@@ -25,6 +29,10 @@
 //! platform file and image it was given (and the bundled probe) and refuses to start on a mismatch, so a run
 //! against the wrong release is caught before anything boots, not misread as a driver fault. It does not fetch
 //! anything - the operator still supplies the platform file and image.
+//!
+//! `[qemu.x86_64]` and `[qemu.riscv64]` are for the device a machine reaches differently: a USB device on riscv64
+//! goes on the bus of the xHCI that holds the disk (`gdcs-xhci.0`), where on x86-64 the driver adds its own. A board
+//! with no table uses `[qemu].devices`.
 
 use serde::Deserialize;
 
@@ -68,6 +76,44 @@ pub struct Qemu {
     /// `-device` values, each one QEMU device with its options (`edu`, `e1000,netdev=n1`).
     #[serde(default)]
     pub devices: Vec<String>,
+    /// On the x86-64 machine, in place of `devices`.
+    #[serde(default)]
+    pub x86_64: Option<Board>,
+    /// On the riscv64 machine, in place of `devices`.
+    #[serde(default)]
+    pub riscv64: Option<Board>,
+}
+
+/// One board's devices (`[qemu.<arch>]`).
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Board {
+    /// `-device` values on this board.
+    #[serde(default)]
+    pub devices: Vec<String>,
+    /// The driver cannot be run on this board, and why: the run is refused before anything boots.
+    #[serde(default)]
+    pub unsupported: Option<String>,
+}
+
+impl Qemu {
+    fn board(&self, arch: &str) -> Option<&Board> {
+        match arch {
+            "x86_64" => self.x86_64.as_ref(),
+            "riscv64" => self.riscv64.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// The devices for the machine of `arch` (`x86_64`, `riscv64`): its own table's, else `[qemu].devices`.
+    pub fn devices_for(&self, arch: &str) -> &[String] {
+        self.board(arch).map_or(&self.devices, |b| &b.devices)
+    }
+
+    /// Why the driver says it cannot be run on the machine of `arch`, if it does.
+    pub fn unsupported_on(&self, arch: &str) -> Option<&str> {
+        self.board(arch).and_then(|b| b.unsupported.as_deref())
+    }
 }
 
 /// One claimed behaviour: a line the driver logs when it has done the thing.
@@ -136,9 +182,20 @@ pub fn read(text: &str) -> Result<Declaration, String> {
             ));
         }
     }
-    for dev in &d.qemu.devices {
+    let boards = [d.qemu.x86_64.as_ref(), d.qemu.riscv64.as_ref()];
+    for dev in d
+        .qemu
+        .devices
+        .iter()
+        .chain(boards.iter().flatten().flat_map(|b| b.devices.iter()))
+    {
         if dev.is_empty() || dev.starts_with('-') || dev.chars().any(|c| c.is_whitespace()) {
             return Err(format!("gdcs.toml: `{dev}` is not one QEMU device"));
+        }
+    }
+    for b in boards.iter().flatten() {
+        if b.unsupported.as_deref().is_some_and(|w| w.trim().is_empty()) {
+            return Err("gdcs.toml: `unsupported` says nothing - say why the driver cannot be run there".to_string());
         }
     }
     Ok(d)
@@ -180,6 +237,57 @@ mod tests {
         assert!(read("format = 1\n\n[target]\nos = \"v0.31.0\"\n").is_err());
         assert!(read("format = 1\n\n[target]\nos = \"latest\"\n").is_err());
         assert!(read("format = 1\n\n[target]\nos = \"\"\n").is_err());
+    }
+
+    #[test]
+    fn a_board_table_replaces_the_devices_on_that_board_only() {
+        let d = read(
+            "format = 1
+
+[qemu]
+devices = [\"a\"]
+
+[qemu.riscv64]
+devices = [\"b\"]
+",
+        )
+        .unwrap();
+        assert_eq!(d.qemu.devices_for("x86_64"), ["a"]);
+        assert_eq!(d.qemu.devices_for("riscv64"), ["b"]);
+        assert!(d.qemu.unsupported_on("riscv64").is_none());
+        let u = read(
+            "format = 1
+
+[qemu.riscv64]
+unsupported = \"takes the disk's host\"
+",
+        )
+        .unwrap();
+        assert_eq!(u.qemu.unsupported_on("riscv64"), Some("takes the disk's host"));
+        assert!(read(
+            "format = 1
+
+[qemu.riscv64]
+unsupported = \" \"
+"
+        )
+        .is_err());
+        assert!(read(
+            "format = 1
+
+[qemu.riscv64]
+devices = [\"-bios\"]
+"
+        )
+        .is_err());
+        assert!(read(
+            "format = 1
+
+[qemu.arm]
+devices = []
+"
+        )
+        .is_err());
     }
 
     #[test]

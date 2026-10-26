@@ -5,11 +5,17 @@
 //! offered by a web server on the host for `download` to fetch. Nothing is baked into the image or its disk, and no
 //! OS code is linked or copied here (SPECIFICATION.md 10, 11).
 //!
-//! The machine is x86-64 on QEMU's `pc` board: UEFI firmware from QEMU's own `edk2-x86_64-code.fd`, the image on
-//! the legacy IDE controller where the firmware boots it and GodspeedOS does not look for data, a blank data disk
-//! alone on an AHCI controller, an e1000 on QEMU's user network, where the host is 10.0.2.2, a silent audio backend
-//! (`gdcs-audio`) for a declared sound device to use, and a file chardev (`gdcs-serial`) for a declared serial
-//! device to send to.
+//! Two machines ([`Board`]), each the one its release image is built for:
+//!
+//! - **x86-64 on QEMU's `pc` board**: UEFI firmware from QEMU's own `edk2-x86_64-code.fd`, the image on the legacy IDE
+//!   controller where the firmware boots it and GodspeedOS does not look for data, and a blank data disk alone on an
+//!   AHCI controller.
+//! - **riscv64 on QEMU's `virt` board**: OpenSBI (`-bios default`) and the release's virt kernel ELF (`-kernel`), and
+//!   the blank data disk as a USB stick behind an xHCI controller (`gdcs-xhci`), which is where this port keeps its
+//!   storage: `block-driver` on riscv64 speaks USB mass storage and has no AHCI.
+//!
+//! Both have an e1000 on QEMU's user network, where the host is 10.0.2.2, a silent audio backend (`gdcs-audio`) for a
+//! declared sound device to use, and a file chardev (`gdcs-serial`) for a declared serial device to send to.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -21,14 +27,52 @@ use std::time::{Duration, Instant};
 /// The file, in the work folder, that the `gdcs-serial` chardev writes: what a declared serial device sent.
 pub const SERIAL_DEVICE_OUT: &str = "gdcs-serial.out";
 
+/// Which machine QEMU makes, and what boots it.
+#[derive(Clone, Debug)]
+pub enum Board {
+    /// x86-64 `pc`, booted by this UEFI firmware from the release image (`godspeed-os-<tag>-x86_64.img`).
+    Pc {
+        /// The UEFI firmware.
+        firmware: PathBuf,
+    },
+    /// riscv64 `virt`, OpenSBI then the release's virt kernel (`godspeed-os-<tag>-riscv64-qemu-virt.elf`).
+    RiscvVirt,
+}
+
+impl Board {
+    /// The architecture its binaries are built for, as a package names it (`x86_64.elf`).
+    pub fn arch(&self) -> &'static str {
+        match self {
+            Board::Pc { .. } => "x86_64",
+            Board::RiscvVirt => "riscv64",
+        }
+    }
+
+    /// The QEMU that makes it, when none is named.
+    pub fn default_qemu(&self) -> &'static str {
+        match self {
+            Board::Pc { .. } => "qemu-system-x86_64",
+            Board::RiscvVirt => "qemu-system-riscv64",
+        }
+    }
+
+    /// The machine in a few words, for the report.
+    pub fn describe(&self) -> &'static str {
+        match self {
+            Board::Pc { .. } => "pc board, UEFI, e1000, AHCI data disk",
+            Board::RiscvVirt => "virt board, OpenSBI, e1000, USB data disk on xHCI",
+        }
+    }
+}
+
 /// How the machine is made.
 #[derive(Clone, Debug)]
 pub struct Config {
-    /// `qemu-system-x86_64`.
+    /// `qemu-system-x86_64` or `qemu-system-riscv64`, for the board.
     pub qemu: PathBuf,
-    /// The UEFI firmware.
-    pub firmware: PathBuf,
-    /// The release image. A copy is booted, so the file given is never written.
+    /// The board, and what boots it.
+    pub board: Board,
+    /// The release image (x86-64) or kernel (riscv64). A copy is booted, so the file given is never written.
     pub image: PathBuf,
     /// Where the copy, the data disk and the serial log go.
     pub work: PathBuf,
@@ -156,7 +200,10 @@ impl Machine {
     /// output is lost.
     pub fn boot(cfg: &Config) -> Result<Machine, String> {
         std::fs::create_dir_all(&cfg.work).map_err(|e| format!("{}: {e}", cfg.work.display()))?;
-        let image_copy = cfg.work.join("os.img");
+        let image_copy = cfg.work.join(match cfg.board {
+            Board::Pc { .. } => "os.img",
+            Board::RiscvVirt => "os.elf",
+        });
         std::fs::copy(&cfg.image, &image_copy).map_err(|e| format!("copying {}: {e}", cfg.image.display()))?;
         let data = cfg.work.join("data.img");
         std::fs::write(&data, vec![0u8; 16 * 1024 * 1024]).map_err(|e| format!("{}: {e}", data.display()))?;
@@ -164,25 +211,49 @@ impl Machine {
             let l = TcpListener::bind(("127.0.0.1", 0)).map_err(|e| format!("no free port: {e}"))?;
             l.local_addr().map_err(|e| e.to_string())?.port()
         };
-        let fw = cfg.firmware.to_string_lossy().replace('\\', "/");
         let img = image_copy.to_string_lossy().replace('\\', "/");
         let dat = data.to_string_lossy().replace('\\', "/");
         // What a declared serial device (QEMU's `usb-serial`, say) sends, kept for the report.
         let wire = cfg.work.join(SERIAL_DEVICE_OUT).to_string_lossy().replace('\\', "/");
         let mut cmd = Command::new(&cfg.qemu);
+        match &cfg.board {
+            Board::Pc { firmware } => {
+                let fw = firmware.to_string_lossy().replace('\\', "/");
+                cmd.args([
+                    "-drive",
+                    &format!("if=pflash,format=raw,readonly=on,file={fw}"),
+                    "-drive",
+                    &format!("format=raw,file={img},if=ide"),
+                    "-device",
+                    "ich9-ahci,id=ahci",
+                    "-drive",
+                    &format!("id=data,format=raw,file={dat},if=none"),
+                    "-device",
+                    "ide-hd,drive=data,bus=ahci.0",
+                    "-cpu",
+                    "qemu64,+rdrand",
+                ]);
+            }
+            Board::RiscvVirt => {
+                // The storage host is added FIRST, so the kernel's bus scan meets it before any xHCI a declaration
+                // adds. A declared USB device goes on its bus, `gdcs-xhci.0`.
+                cmd.args([
+                    "-M",
+                    "virt",
+                    "-bios",
+                    "default",
+                    "-kernel",
+                    &img,
+                    "-device",
+                    "qemu-xhci,id=gdcs-xhci",
+                    "-drive",
+                    &format!("id=data,format=raw,file={dat},if=none"),
+                    "-device",
+                    "usb-storage,bus=gdcs-xhci.0,drive=data",
+                ]);
+            }
+        }
         cmd.args([
-            "-drive",
-            &format!("if=pflash,format=raw,readonly=on,file={fw}"),
-            "-drive",
-            &format!("format=raw,file={img},if=ide"),
-            "-device",
-            "ich9-ahci,id=ahci",
-            "-drive",
-            &format!("id=data,format=raw,file={dat},if=none"),
-            "-device",
-            "ide-hd,drive=data,bus=ahci.0",
-            "-cpu",
-            "qemu64,+rdrand",
             "-smp",
             &cfg.smp.to_string(),
             "-m",

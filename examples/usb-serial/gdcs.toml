@@ -15,6 +15,11 @@ os = "0.31.0"
 [qemu]
 devices = ["qemu-xhci,id=xhci", "usb-serial,bus=xhci.0,chardev=gdcs-serial"]
 
+# On riscv64 the disk is a USB stick, so the machine already has an xHCI (`gdcs-xhci`), and it is the one the OS
+# drives: the adapter goes on its bus rather than on a second controller nobody would drive.
+[qemu.riscv64]
+devices = ["usb-serial,bus=gdcs-xhci.0,chardev=gdcs-serial"]
+
 # What the driver claims to do: a line it logs when it has done its job, which GDCS waits for after installing
 # it (Stage 3). A functional pass covers only what is declared here.
 [[behaviour]]

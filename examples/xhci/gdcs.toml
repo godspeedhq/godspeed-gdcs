@@ -14,6 +14,11 @@ os = "0.31.0"
 [qemu]
 devices = ["qemu-xhci,id=xhci", "usb-kbd,bus=xhci.0", "usb-mouse,bus=xhci.0"]
 
+# Not on riscv64: there the machine's disk is a USB stick, and the xHCI the OS drives is the one it is on. A package
+# that takes the xHCI class over would take the disk away from `fs` mid-run, which tests nothing about this driver.
+[qemu.riscv64]
+unsupported = "the machine's disk is on the xHCI this driver would take over"
+
 # What the driver claims to do: a line it logs when it has done its job, which GDCS waits for after installing
 # it (Stage 3). A functional pass covers only what is declared here: two devices found, by registers alone.
 [[behaviour]]
