@@ -398,7 +398,7 @@ dependencies = [
 [[package]]
 name = "godspeed-package"
 version = "0.1.0"
-source = "git+https://github.com/godspeedhq/godspeed-cli?rev=1676e4dd36768d6bbf5ff56229321fa7e2fe68ba#1676e4dd36768d6bbf5ff56229321fa7e2fe68ba"
+source = "git+https://github.com/godspeedhq/godspeed-cli?rev=9afe4ed01838eeabc81ef835deb5bb0ca7a101a4#9afe4ed01838eeabc81ef835deb5bb0ca7a101a4"
 dependencies = [
  "ed25519-dalek",
  "serde",

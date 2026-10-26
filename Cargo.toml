@@ -13,8 +13,8 @@ path = "src/main.rs"
 
 [dependencies]
 # The package format: the same reader and verifier the CLI and the OS use, so a package means the same thing
-# here as there. Apache-2.0 OR MIT since godspeed-cli 1676e4d; pinned by rev, as the OS pins it.
-godspeed-package = { git = "https://github.com/godspeedhq/godspeed-cli", rev = "1676e4dd36768d6bbf5ff56229321fa7e2fe68ba", features = ["toml"] }
+# here as there. Apache-2.0 OR MIT since godspeed-cli 1676e4d (merged to main in 9afe4ed); pinned by rev, as the OS pins it.
+godspeed-package = { git = "https://github.com/godspeedhq/godspeed-cli", rev = "9afe4ed01838eeabc81ef835deb5bb0ca7a101a4", features = ["toml"] }
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
