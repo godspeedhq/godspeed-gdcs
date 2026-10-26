@@ -249,6 +249,20 @@ impl Machine {
         clean(&self.log.lock().unwrap())
     }
 
+    /// The cleaned text of everything said from raw byte `from` onward. `from` is a value `len()` returned
+    /// earlier; cleaning the raw slice (as `seen_since` does) is correct, whereas slicing `text()` by a raw
+    /// offset is not - cleaning removes bytes, so the offsets do not line up.
+    pub fn text_from(&self, from: usize) -> String {
+        let log = self.log.lock().unwrap();
+        clean(&log[from.min(log.len())..])
+    }
+
+    /// Advance the session cursor past everything said so far, so the next `command`/`wait_for` matches only
+    /// what comes after. Use it to discard stale prompts left in the buffer (a kill storm prints many).
+    pub fn drain(&mut self) {
+        self.cursor = self.log.lock().unwrap().len();
+    }
+
     /// Wait until `needle` appears in what the serial port says after the session's cursor, and move the cursor past
     /// it. Returns what was said up to and including it, cleaned, or `None` at the deadline (the cursor then stays).
     pub fn wait_for(&mut self, needle: &str, secs: u64) -> Option<String> {

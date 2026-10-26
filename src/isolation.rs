@@ -257,8 +257,7 @@ pub fn run(m: &mut Machine, probe: &Probe, target_release: &str, env: &Environme
     };
     // The probe runs its attempts on startup and ends with its `done,` line.
     m.seen_since(from, "isolation-probe: done,", 60);
-    let log = m.text();
-    from_log(&log[from.min(log.len())..], env)
+    from_log(&m.text_from(from), env)
 }
 
 /// `S2.unmapped-read` from a serial log: the fault probe announced its read, the supervisor reported the death
@@ -365,6 +364,5 @@ pub fn run_fault(m: &mut Machine, probe: &Probe, target_release: &str, env: &Env
         );
     }
     m.seen_since(from, "left down", 60);
-    let log = m.text();
-    fault_from_log(&log[from.min(log.len())..], env)
+    fault_from_log(&m.text_from(from), env)
 }

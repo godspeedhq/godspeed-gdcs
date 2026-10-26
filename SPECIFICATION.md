@@ -8,9 +8,12 @@ x86-64 in QEMU (`gdcs run`): Stage 3 for the behaviour a driver declares, and St
 attempts and is refused the things an isolated service must not do (a fabricated capability, a kernel-space
 pointer to a syscall, a gated query, the machine's power, a send capability to a non-peer, a guess past the
 syscall surface), and one that reads an address it was never granted and is killed by the kernel while the
-machine keeps running - plus the grant and whether DMA can be confined. Each check has been seen to fail.
-**Not built:** the other architectures, physical hardware, Stages 4 and 5, and the CLI commands of section 7.
-The README says how to run what is built.
+machine keeps running - plus the grant and whether DMA can be confined. And, with `gdcs run --recovery`, the
+Recovery profile: Stage 4 (MAX CARNAGE) on a second machine, as far as a register-only driver allows - killed
+past the restart cap, recovered then bounded, frames reclaimed, the kernel and other services untouched. Each
+check has been seen to fail. **Not built:** the device-specific carnage (flood, hot-plug, device-reset) and the
+lateness auto-rerun (Stage 4 below), the other architectures, physical hardware, Stage 5, and the CLI commands
+of section 7. The README says how to run what is built.
 
 ## 1. Purpose
 
@@ -212,6 +215,23 @@ restarted at most five times a boot, then left down and said so.
   recur as a flake with both results - never silently as a pass.
 - **No order dependence.** A test that kills a service (the clock, say) must not make the next test fail for a
   reason of its own. Each test states its preconditions and waits for them.
+
+**As built (2026-10-26), for a register-only driver on its own fresh machine (`gdcs run --recovery`,
+`src/carnage.rs`).** The core required outcome is run and measured: the driver is killed one past the
+installed-package restart cap, and GDCS checks it was recovered each time (`S4.recover`), that recovery is
+bounded - restarted exactly `RESTARTS_MAX` times then left down, loudly (`S4.bounded`) - that every death
+reclaimed the task's frames (`S4.cleanup`, the kernel's `freed N frames`, none zero), that the kernel and
+unrelated services are untouched (`S4.bystanders`: the shell answers, a file round-trips through `fs`,
+`net-stack` still pings), and that nothing panicked or wedged (`S4.kernel`). The storm runs on a SECOND machine
+so the restart cap starts at zero and nothing else is disturbed.
+
+**Recorded, not yet built (CLAUDE.md 26.7).** The device-specific carnage needs a driver this register-only
+subject is not: the **flood** (refused sends counted while down) needs a client peer, and **device
+disconnect/reconnect** and a **device-reset failure** need a hot-pluggable device (its device is PCI `edu`,
+which QEMU does not hot-plug). **Input integrity** across a hot-plug likewise needs the hot-plug. **Memory
+pressure** is not injected. And the **lateness** rule is not automated: a `LIVENESS WEDGE` under the storm is
+reported as what it is, with a note to rerun once (backlog/49), rather than GDCS rerunning on its own. These
+are named in the report's detail where they would otherwise look like silent gaps.
 
 ### Stage 5 - Live Replacement
 

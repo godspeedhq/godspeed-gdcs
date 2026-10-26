@@ -329,3 +329,125 @@ supervisor: installed gdcs/mmu-fault-probe died - memory fault at 0x0 - restarte
     let hung = "mmu-fault-probe: reading 0x0, an address this service was never granted\n";
     assert_eq!(isolation::fault_from_log(hung, &env).outcome, Outcome::NotRun);
 }
+
+// --- Stage 4 (MAX CARNAGE) parser, each outcome seen without a machine ---
+
+use gdcs::carnage;
+
+/// A storm log where the driver was killed 5 times (each recovered) then left down on the 6th, each death
+/// reclaiming frames. The bystander result is passed in (driven live by the real run).
+fn carnage_good() -> String {
+    let mut s = String::new();
+    for n in 1..=5 {
+        s.push_str("kill_task: slot=15 'gdcs/edu-driver' freed 84 frames\n");
+        s.push_str(&format!(
+            "supervisor: installed gdcs/edu-driver died - killed by shell, restarting ({n} of 5)\n"
+        ));
+        s.push_str("supervisor: installed gdcs/edu-driver 0.1.0 started\n");
+    }
+    s.push_str("kill_task: slot=15 'gdcs/edu-driver' freed 84 frames\n");
+    s.push_str("supervisor: installed gdcs/edu-driver died - killed by shell - restarted 5 times already, left down\n");
+    s
+}
+
+fn pass_bystanders() -> TestResult {
+    TestResult {
+        id: "S4.bystanders".into(),
+        version: 1,
+        title: "t".into(),
+        outcome: Outcome::Pass,
+        detail: String::new(),
+        evidence: vec![],
+        environment: env(),
+    }
+}
+
+fn c_outcome(log: &str, id: &str) -> Outcome {
+    carnage::from_log(log, "gdcs/edu-driver", pass_bystanders(), &env())
+        .into_iter()
+        .find(|r| r.id == id)
+        .unwrap()
+        .outcome
+}
+
+#[test]
+fn carnage_good_log_passes_recover_bounded_cleanup() {
+    let g = carnage_good();
+    assert_eq!(c_outcome(&g, "S4.recover"), Outcome::Pass);
+    assert_eq!(c_outcome(&g, "S4.bounded"), Outcome::Pass);
+    assert_eq!(c_outcome(&g, "S4.cleanup"), Outcome::Pass);
+    assert_eq!(c_outcome(&g, "S4.kernel"), Outcome::Pass);
+}
+
+#[test]
+fn carnage_bounded_fails_when_unbounded_or_wrong_cap() {
+    // Never left down, more restarts than the cap: unbounded, a failure.
+    let mut unb = String::new();
+    for n in 1..=7 {
+        unb.push_str(&format!(
+            "supervisor: installed gdcs/edu-driver died - killed by shell, restarting ({n} of 5)\n"
+        ));
+    }
+    assert_eq!(c_outcome(&unb, "S4.bounded"), Outcome::Fail);
+    // Left down early (not at the cap): also a failure.
+    let early = "supervisor: installed gdcs/edu-driver died - killed by shell, restarting (1 of 5)\nsupervisor: installed gdcs/edu-driver died - killed by shell - restarted 5 times already, left down\n";
+    assert_eq!(c_outcome(early, "S4.bounded"), Outcome::Fail);
+}
+
+#[test]
+fn carnage_cleanup_fails_on_a_zero_reclaim_or_a_missing_one() {
+    // A death with no `freed` line at all.
+    let none = "supervisor: installed gdcs/edu-driver died - killed by shell, restarting (1 of 5)\n";
+    assert_eq!(c_outcome(none, "S4.cleanup"), Outcome::Fail);
+    // A death that reclaimed 0 frames.
+    let zero = "kill_task: slot=15 'gdcs/edu-driver' freed 0 frames\nsupervisor: installed gdcs/edu-driver died - killed by shell, restarting (1 of 5)\n";
+    assert_eq!(c_outcome(zero, "S4.cleanup"), Outcome::Fail);
+}
+
+#[test]
+fn carnage_recover_fails_when_the_driver_never_restarts() {
+    let log = "supervisor: installed gdcs/edu-driver died - killed by shell - restarted 5 times already, left down\n";
+    assert_eq!(c_outcome(log, "S4.recover"), Outcome::Fail);
+}
+
+#[test]
+fn carnage_kernel_fails_on_a_panic_or_wedge_and_notes_a_wedge() {
+    let g = carnage_good();
+    assert_eq!(carnage::kernel(&g, &env()).outcome, Outcome::Pass);
+    let panic = format!("{g}KERNEL PANIC: panicked at x\n");
+    assert_eq!(carnage::kernel(&panic, &env()).outcome, Outcome::Fail);
+    let wedge = format!("{g}LIVENESS WEDGE: core 0 made NO progress\n");
+    let r = carnage::kernel(&wedge, &env());
+    assert_eq!(r.outcome, Outcome::Fail);
+    assert!(r.detail.contains("rerun once"), "{}", r.detail);
+}
+
+#[test]
+#[ignore = "boots QEMU"]
+fn carnage_on_a_real_machine_is_bounded_and_survivable() {
+    let image = PathBuf::from(std::env::var("GDCS_IMAGE").expect("GDCS_IMAGE"));
+    let file = std::fs::read(std::env::var("GDCS_SUBJECT").expect("GDCS_SUBJECT")).unwrap();
+    let qemu = PathBuf::from(std::env::var("GDCS_QEMU").unwrap_or_else(|_| "qemu-system-x86_64".into()));
+    let key = {
+        let pkg = gdcs::package::read(&file).unwrap();
+        let sig = std::str::from_utf8(pkg.own("manifest.sig").unwrap()).unwrap();
+        godspeed_package::ManifestSignature::parse(sig).unwrap().key.to_string()
+    };
+    let cfg = Config {
+        firmware: gdcs::machine::default_firmware(&qemu).expect("firmware"),
+        qemu,
+        image,
+        work: std::env::temp_dir().join(format!("gdcs-carnage-{}", std::process::id())),
+        devices: vec!["edu".into()],
+        smp: 2,
+    };
+    let s = subject(&file, &key, true);
+    let expect = std::env::var("GDCS_EXPECT").expect("GDCS_EXPECT");
+    let r = carnage::run(&cfg, &s, Some(&expect), "0.31.0", &env());
+    for x in &r {
+        eprintln!("carnage: {} {} - {}", x.id, x.outcome.word(), x.detail);
+    }
+    for id in ["S4.recover", "S4.bounded", "S4.cleanup", "S4.bystanders", "S4.kernel"] {
+        assert_eq!(r.iter().find(|x| x.id == id).unwrap().outcome, Outcome::Pass, "{id}");
+    }
+}

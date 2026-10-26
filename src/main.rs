@@ -37,7 +37,7 @@ enum Command {
         verbose: bool,
     },
     /// The Basic profile: Stage 1, then the driver installed on a release image in QEMU and watched (Stages 2, 3).
-    /// x86-64 only, simulated.
+    /// With --recovery, also Stage 4 (MAX CARNAGE) on a second machine. x86-64 only, simulated.
     Run {
         /// The driver package, `<name>-<version>.gsp`.
         package: PathBuf,
@@ -65,6 +65,9 @@ enum Command {
         /// Cores.
         #[arg(long, default_value_t = 2)]
         smp: u32,
+        /// Also run Stage 4 (MAX CARNAGE) on a second machine: the Recovery profile. Adds a few minutes.
+        #[arg(long)]
+        recovery: bool,
         /// Print every result's detail and evidence, passes included.
         #[arg(long, short)]
         verbose: bool,
@@ -113,6 +116,7 @@ fn main() -> ExitCode {
             qemu,
             firmware,
             smp,
+            recovery,
             verbose,
         } => {
             let (platform, file, name) = match inputs(&platform, &package) {
@@ -168,9 +172,20 @@ fn main() -> ExitCode {
                     &env,
                     "Stage 1 failed: a package refused offline is not booted",
                 ));
+                if recovery {
+                    results.extend(gdcs::carnage::not_run(
+                        &env,
+                        "Stage 1 failed: a package refused offline is not booted",
+                    ));
+                }
             } else {
                 match basic_subject(&file) {
-                    Err(why) => results.extend(gdcs::basic::not_run(&env, &why)),
+                    Err(why) => {
+                        results.extend(gdcs::basic::not_run(&env, &why));
+                        if recovery {
+                            results.extend(gdcs::carnage::not_run(&env, &why));
+                        }
+                    }
                     Ok((key, dma)) => {
                         let s = gdcs::basic::Subject {
                             name: &subject.name,
@@ -204,6 +219,27 @@ fn main() -> ExitCode {
                                 });
                             }
                         }
+                        if recovery {
+                            // Stage 4 on its OWN fresh machine, so the restart cap starts at zero and the
+                            // storm interferes with nothing else. No extra QEMU devices: the carnage is kills,
+                            // not the device, so the subject does its one-shot work and then is stormed.
+                            let carnage_cfg = gdcs::machine::Config {
+                                work: out.join("carnage"),
+                                devices: decl.qemu.devices.clone(),
+                                ..cfg.clone()
+                            };
+                            let behaviour = decl.behaviour.first().map(|b| b.expect.as_str());
+                            eprintln!("gdcs: --recovery; booting a second machine for Stage 4 (MAX CARNAGE)");
+                            results.extend(gdcs::carnage::run(&carnage_cfg, &s, behaviour, &platform.os, &env));
+                            if let Ok(b) = std::fs::read(carnage_cfg.work.join("serial.log")) {
+                                if std::fs::write(out.join("serial-carnage.log"), &b).is_ok() {
+                                    logs.push(LogFile {
+                                        name: "serial-carnage.log".to_string(),
+                                        sha256: hex(&Sha256Digest::of(&b).0),
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -219,7 +255,11 @@ fn main() -> ExitCode {
             let report = Report {
                 format: REPORT_FORMAT,
                 gdcs: GDCS_VERSION,
-                profile: "Basic 0.1 (Stages 1-3)".to_string(),
+                profile: if recovery {
+                    "Recovery 0.1 (Stages 1-4)".to_string()
+                } else {
+                    "Basic 0.1 (Stages 1-3)".to_string()
+                },
                 subject,
                 target: target(&platform),
                 results,

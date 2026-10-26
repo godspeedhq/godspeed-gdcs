@@ -3,10 +3,12 @@
 **The Godspeed Driver Conformance Suite (GDCS)**: an independent way to test a GodspeedOS driver and to say,
 in a report anyone can check, what was shown, where, and what was not.
 
-> **Status: Stage 1, and the Basic profile in QEMU on x86-64.** `gdcs check` runs Stage 1 on a package file;
+> **Status: the Basic and Recovery profiles, in QEMU on x86-64.** `gdcs check` runs Stage 1 on a package file;
 > `gdcs run` adds Stages 2 and 3 on a release image in QEMU, Stage 2 by two probes GDCS installs and watches -
 > one refused each thing it tries, one read of an ungranted address that the kernel kills it for while staying
-> up. [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is not;
+> up. `gdcs run --recovery` adds Stage 4 (MAX CARNAGE) on a second machine: the driver killed over and over,
+> recovered each time and then left down at the bound, the kernel and other services untouched.
+> [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is not;
 > [Running it](#running-it) is how.
 
 ## Why it exists
@@ -134,6 +136,7 @@ for `run`, the x86-64 image unpacked from `godspeed-os-<tag>-x86_64.img.zip`.
 gdcs check edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver
 gdcs run   edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu-driver \
            --image godspeed-os-v0.31.0-x86_64.img --out gdcs-run
+gdcs run   ... --recovery        # the Recovery profile: also Stage 4 (MAX CARNAGE)
 ```
 
 - **`check`** is Stage 1 alone, on the file, with no machine. `--source` is the driver's project folder, for the
@@ -144,6 +147,9 @@ gdcs run   edu-driver-0.1.0.gsp --platform godspeed-platform.toml --source ./edu
   `qemu-system-x86_64` and the UEFI firmware QEMU ships (`share/edk2-x86_64-code.fd`; `--qemu` and `--firmware`
   name them otherwise). A run takes a few minutes. `--out` gets `report.txt`, `report.json` and `serial.log`, with
   the log's SHA-256 in the report.
+- **`run --recovery`** is the Recovery profile: everything in Basic, then Stage 4 on a SECOND fresh machine - the
+  driver killed one past the restart cap, recovered each time and then left down, with the kernel and unrelated
+  services (shell, `fs`, `net-stack`) still working afterward. It keeps a `serial-carnage.log` beside the rest.
 - Exit status: 0 conformant, 1 not conformant, 3 incomplete (a required test did not run), 2 the run could not start.
 
 **The driver's declaration**, `gdcs.toml` in its project folder, says what the driver claims to do and what QEMU must
@@ -180,9 +186,6 @@ S2.acquire                           PASS       a send capability to a non-peer 
 S2.fuzz                              PASS       out-of-range syscalls return a defined error, no crash
 S2.unmapped-read                     PASS       a dereference of an address not granted faults, killing the caller, not the kernel
 S3.kernel                            PASS       no kernel panic or wedge
-
-29 run: 28 passed, 0 failed, 0 not run, 1 not shown or not enforceable, 0 findings
-RESULT: CONFORMANT (offline + simulated)
 ```
 
 `S2.dma` is `NOT ENFORCEABLE` because QEMU's `pc` board has no IOMMU; on a machine that confines the device it
@@ -191,9 +194,22 @@ reads `NOT SHOWN` (QEMU maps but does not fault) or, on silicon, `PASS`. The S2 
 `S2.unmapped-read` shown by the fault probe's death (the kernel kills it at the bad access, restarts it a bounded
 number of times, and leaves it down, all without panicking).
 
-**Its own tests.** `cargo test` runs Stage 1's and the Stage 2 parser's: a package or a log built to fail each
-check, which fails that check and no other. The QEMU cases are `#[ignore]`d and named in `tests/basic.rs`, with
-the variables they need.
+With `--recovery`, Stage 4 follows on a second machine:
+
+```
+S4.recover                           PASS       each kill is recovered by the supervisor
+S4.bounded                           PASS       recovery is bounded, then left down loudly
+S4.cleanup                           PASS       every death reclaims the task's frames
+S4.bystanders                        PASS       the kernel and unrelated services survive
+S4.kernel                            PASS       no kernel panic or wedge under carnage
+
+34 run: 33 passed, 0 failed, 0 not run, 1 not shown or not enforceable, 0 findings
+RESULT: CONFORMANT (offline + simulated)
+```
+
+**Its own tests.** `cargo test` runs Stage 1's, the Stage 2 parser's, and Stage 4's: a package or a log built to
+fail each check, which fails that check and no other. The QEMU cases are `#[ignore]`d and named in
+`tests/basic.rs`, with the variables they need.
 
 ## AI-assisted drivers
 
