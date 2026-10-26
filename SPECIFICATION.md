@@ -12,8 +12,9 @@ machine keeps running - plus the grant and whether DMA can be confined. And, wit
 Recovery profile: Stage 4 (MAX CARNAGE) on a second machine, as far as a register-only driver allows - killed
 past the restart cap, recovered then bounded, frames reclaimed, the kernel and other services untouched. Each
 check has been seen to fail. **Not built:** the device-specific carnage (flood, hot-plug, device-reset) and the
-lateness auto-rerun (Stage 4 below), the other architectures, physical hardware, Stage 5, and the CLI commands
-of section 7. The README says how to run what is built.
+lateness auto-rerun (Stage 4 below), running on the Arm boards (they are built and checked for, but QEMU's Pi
+machines have no network), physical hardware ([`backlog/1`](backlog/1-hardware-mode-waits-for-a-usb-serial-adapter.md)),
+Stage 5, and the CLI commands of section 7. The README says how to run what is built.
 
 ## 1. Purpose
 
