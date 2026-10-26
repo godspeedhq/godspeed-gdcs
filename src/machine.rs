@@ -7,7 +7,8 @@
 //!
 //! The machine is x86-64 on QEMU's `pc` board: UEFI firmware from QEMU's own `edk2-x86_64-code.fd`, the image on
 //! the legacy IDE controller where the firmware boots it and GodspeedOS does not look for data, a blank data disk
-//! alone on an AHCI controller, and an e1000 on QEMU's user network, where the host is 10.0.2.2.
+//! alone on an AHCI controller, an e1000 on QEMU's user network, where the host is 10.0.2.2, and a silent audio
+//! backend (`gdcs-audio`) for a declared sound device to use.
 
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -189,6 +190,10 @@ impl Machine {
             "e1000,netdev=n0",
             "-netdev",
             "user,id=n0",
+            // A silent audio backend, for a declared sound device to use (`hda-output,audiodev=gdcs-audio`).
+            // QEMU's codecs need one; with none declared it is unused, and it never makes a sound.
+            "-audiodev",
+            "none,id=gdcs-audio",
         ]);
         for d in &cfg.devices {
             cmd.args(["-device", d]);
