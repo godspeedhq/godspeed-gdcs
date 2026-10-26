@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: Apache-2.0
+# Godspeed project manifest. It says what kind of project this is, where its contract is, and what a
+# package of it says about itself. Name, version, the authority the driver requests and the device it
+# drives live in the contract, not here.
+format   = 1
+kind     = "driver"
+contract = "contracts/e1000-gdcs.toml"
+
+description = "GDCS example: an Intel 82540EM (e1000) driver - reset, link, MAC, one frame sent by DMA"
+
+# The namespace a package of this driver is published under: "alice" makes it alice/e1000-gdcs.
+# `godspeed package` needs it.
+publisher = "gdcs"
+license   = "Apache-2.0"

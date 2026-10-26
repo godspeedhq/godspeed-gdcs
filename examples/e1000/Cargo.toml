@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+[package]
+name = "e1000-gdcs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "e1000-gdcs"
+path = "src/main.rs"
+
+[dependencies]
+# The Godspeed standard library, at the OS release this project was created against.
+godspeed = { git = "https://github.com/godspeedhq/godspeed-os", tag = "v0.31.0" }
+
+# This project is its own workspace, wherever it is created.
+[workspace]
+
+# A service has no unwinder: a panic ends the service, and the supervisor sees it die.
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
+opt-level = "s"
+lto = true
+codegen-units = 1

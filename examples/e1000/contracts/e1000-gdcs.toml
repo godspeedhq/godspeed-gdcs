@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+# The driver's contract: what it REQUESTS, the device among it. It grants nothing. The operator approves
+# the device at `godspeed install`, and the OS finds WHICH device that is on its own bus scan: a contract
+# names a kind of device, never an address.
+# Format: contracts/schema/service.schema.json in GodspeedOS. `godspeed check` validates against it.
+name    = "e1000-gdcs"
+version = "0.1.0"
+
+[resources.memory]
+request = "16MiB"
+limit   = "16MiB"
+
+[capabilities]
+log_write = true      # write lines to the kernel log
+# The device, by what the PCI bus says it is: class, subclass and programming interface, six hex digits.
+# This one is QEMU's teaching device `edu` (`-device edu`), class 00:ff:00, which no driver in GodspeedOS
+# claims. Naming a class a GodspeedOS driver does handle is allowed: installing this one stops that driver for
+# the device, and uninstalling it starts that driver again.
+hw_pci_class = "020000"  # PCI class 02:00:00 - an ethernet controller (QEMU's e1000, 8086:100e)
+hw_pci_bar   = 0      # its registers are in BAR 0
+hw_pci_irq   = true   # its interrupt: the OS picks the vector and programs the device; you never name one
+# A DMA arena: memory the device reads and writes by itself, as a size (at most 2MiB). The operator is asked
+# about it on its own, on every machine, because where no IOMMU confines the device (every Raspberry Pi and the
+# VisionFive, an Intel PC, a PC device left in passthrough) its driver can reach all of memory.
+hw_dma       = "16KiB"    # a TX ring and a frame buffer the NIC reads by DMA
