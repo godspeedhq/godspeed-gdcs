@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+# Builds the documentation site from the repository and publishes it to
+# GitHub Pages. Started by tools/docs/publish.sh, or by hand:
+#   gh workflow run pages.yml
+name: pages
+
+on:
+  workflow_dispatch:
+  # Pull requests that touch the documentation or what it is generated from
+  # build the site, without publishing it, so a broken page is caught before merge.
+  pull_request:
+    paths:
+      - '*.md'
+      - 'backlog/**'
+      - 'examples/**'
+      - 'fixtures/README.md'
+      - 'schema/**'
+      - 'src/**'
+      - 'tools/docs/**'
+      - '.github/workflows/pages.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One publish at a time; a newer one replaces a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: generate the pages from the repository
+        run: python3 tools/docs/build.py site-src
+      - uses: actions/configure-pages@v5
+        if: github.event_name == 'workflow_dispatch'
+      - name: render with Jekyll
+        uses: actions/jekyll-build-pages@v1
+        with:
+          source: ./site-src
+          destination: ./_site
+      - uses: actions/upload-pages-artifact@v3
+
+  deploy:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
