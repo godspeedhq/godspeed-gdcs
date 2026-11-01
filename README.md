@@ -11,6 +11,9 @@ in a report anyone can check, what was shown, where, and what was not.
 > [`SPECIFICATION.md`](SPECIFICATION.md) is the draft (0.1) and says exactly what is built and what is not;
 > [Running it](#running-it) is how.
 
+**Documentation: <https://godspeedhq.github.io/godspeed-gdcs/>**, generated from this repository by
+`tools/docs/build.py`. After a change is on main, `bash tools/docs/publish.sh` rebuilds and publishes it.
+
 ## Why it exists
 
 GodspeedOS drivers are userspace services on a capability microkernel. A driver developer - a person or an AI
